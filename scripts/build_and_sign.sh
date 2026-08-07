@@ -4,15 +4,15 @@
 #
 #   ./scripts/build_and_sign.sh
 #
-# Generation runs anywhere Python 3 does. Signing is macOS-only: `shortcuts` is
-# an Apple CLI built into macOS 12 and later, so on Linux this script builds the
-# unsigned files and then stops with an explicit error rather than pretending.
+# Generation runs anywhere Python 3 does. Signing is macOS-only and additionally
+# needs an Apple Account signed in on the machine, so it is best effort: when a
+# signer is unavailable the unsigned files are still the deliverable.
 #
 # Adding a shortcut needs no change here. Any shortcuts/<name>/build.py is
 # discovered automatically and asked to write into build/unsigned.
 #
 # Nothing under shortcuts/ is modified. Generated output goes to build/, which
-# is git-ignored; the signed files are collected by CI as artifacts.
+# is git-ignored and collected by CI as artifacts.
 
 set -euo pipefail
 shopt -s nullglob
@@ -21,7 +21,6 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$REPO_ROOT/build"
 UNSIGNED_DIR="$BUILD_DIR/unsigned"
 SIGNED_DIR="$BUILD_DIR/signed"
-DIAG_DIR="$BUILD_DIR/diagnostics"
 
 PYTHON="${PYTHON:-python3}"
 
@@ -34,18 +33,11 @@ die() {
 echo "==> Repository: $REPO_ROOT"
 
 # --- Clean ----------------------------------------------------------------
-# Wiping these two keeps runs deterministic: a shortcut deleted from the repo
-# must not survive in build/ and get signed and published anyway.
-#
-# build/diagnostics is deliberately NOT removed — the diagnostics step runs
-# before this script, and its report has to survive to be published.
+# A full wipe keeps runs deterministic: a shortcut deleted from the repo must
+# not survive in build/ and get published anyway.
 echo "==> Cleaning build output"
-rm -rf "$UNSIGNED_DIR" "$SIGNED_DIR"
-mkdir -p "$UNSIGNED_DIR" "$SIGNED_DIR" "$DIAG_DIR"
-
-# Truncated, not appended: a stale verdict from a previous local run in the
-# same checkout would otherwise sit in the artifact next to the current one.
-: >"$DIAG_DIR/signing-result.txt"
+rm -rf "$BUILD_DIR"
+mkdir -p "$UNSIGNED_DIR" "$SIGNED_DIR"
 
 # --- Generate -------------------------------------------------------------
 command -v "$PYTHON" >/dev/null 2>&1 || die "'$PYTHON' not found; Python 3 is required to generate shortcuts."
@@ -82,127 +74,67 @@ for file in "${unsigned[@]}"; do
     echo "    - $(basename "$file") ($(wc -c <"$file" | tr -d ' ') bytes)"
 done
 
-# --- Sign -----------------------------------------------------------------
+# --- Sign (best effort) ---------------------------------------------------
+# Signing is optional. It needs Apple's `shortcuts` CLI, which exists only on
+# macOS, AND an Apple Account signed in on that machine. Neither is available
+# in CI: macOS VMs cannot hold an iCloud session, which is why Codemagic's
+# runner fails here regardless of what certificates are injected.
+#
+# So a missing signer is not an error. The unsigned files are the deliverable;
+# they install on iOS with Settings > Shortcuts > Private Sharing turned on.
+SIGNED_COUNT=0
+SIGNING_NOTE=""
+
 if ! command -v shortcuts >/dev/null 2>&1; then
-    die "Apple's 'shortcuts' CLI was not found.
-       Signing requires macOS 12 or later — the CLI ships with the OS and has no
-       Linux or Windows equivalent. The unsigned files are in build/unsigned.
-       On this machine, run generation only:  python3 shortcuts/<name>/build.py"
-fi
+    SIGNING_NOTE="skipped: Apple's 'shortcuts' CLI is macOS-only and is not on this machine"
+else
+    echo ""
+    echo "==> Signing with: $(command -v shortcuts)"
 
-# Is an Apple signing identity actually on this machine? An entry from
-# find-identity means the certificate AND its private key are both present, so
-# this is the direct test of whether Codemagic's ios_signing injection landed.
-# Recorded before signing so the failure report can distinguish CASE A from B.
-APPLE_IDENTITY_PRESENT="NO"
-APPLE_IDENTITY_COUNT=0
-if command -v security >/dev/null 2>&1; then
-    identity_list="$(security find-identity -v -p codesigning 2>/dev/null || true)"
-    APPLE_IDENTITY_COUNT="$(printf '%s\n' "$identity_list" | grep -cE '^\s+[0-9]+\)' || true)"
-    [[ "${APPLE_IDENTITY_COUNT:-0}" -gt 0 ]] && APPLE_IDENTITY_PRESENT="YES"
-fi
+    for input in "${unsigned[@]}"; do
+        base="$(basename "$input")"
+        output="$SIGNED_DIR/$base"
 
-echo ""
-echo "==> Signing with: $(command -v shortcuts)"
-echo "==> Apple code signing identities present: $APPLE_IDENTITY_PRESENT ($APPLE_IDENTITY_COUNT found)"
+        set +e
+        sign_output="$(shortcuts sign --mode anyone --input "$input" --output "$output" 2>&1)"
+        sign_rc=$?
+        set -e
 
-# Classify a signing failure from what the CLI actually said, then stop. The
-# distinction decides whether CI signing is salvageable at all, so it is worth
-# more than a generic non-zero exit.
-report_signing_failure() {
-    local base="$1" rc="$2" output_text="$3" mode
-
-    if printf '%s' "$output_text" | grep -qi 'signed into iCloud\|sign in to iCloud\|iCloud account'; then
-        mode="iCloud_session_required"
-    elif [[ "$rc" -eq 0 ]]; then
-        mode="silent_no_output"
-    else
-        mode="unknown"
-    fi
-
-    {
-        echo ""
-        echo "SHORTCUT_SIGNING_FAILURE=$mode"
-        echo "Failed file: $base"
-        echo "shortcuts sign exit code: $rc"
-        echo "Apple developer certificate was present: $APPLE_IDENTITY_PRESENT"
-        echo ""
-        echo "--- CLI output ---"
-        printf '%s\n' "$output_text"
-        echo "------------------"
-        echo ""
-
-        case "$mode" in
-        iCloud_session_required)
-            if [[ "$APPLE_IDENTITY_PRESENT" == "YES" ]]; then
-                echo "CASE B: An Apple signing identity IS installed on this runner, and"
-                echo "'shortcuts sign' rejected it anyway, demanding an Apple Account"
-                echo "session. Shortcut signing does not consume code signing"
-                echo "certificates; the two systems are not bridgeable here."
+        if [[ "$sign_rc" -ne 0 || ! -s "$output" ]]; then
+            rm -f "$output"
+            if printf '%s' "$sign_output" | grep -qi 'iCloud'; then
+                SIGNING_NOTE="skipped: no Apple Account signed in on this machine"
             else
-                echo "CASE A: No Apple signing identity reached this runner AND the CLI"
-                echo "requires an iCloud session. Fix the certificate injection first,"
-                echo "then re-run to find out whether the certificate changes anything."
+                SIGNING_NOTE="failed: $(printf '%s' "$sign_output" | head -1)"
             fi
-            echo ""
-            echo "An iCloud session cannot be established non-interactively: sign-in is"
-            echo "two-factor gated, the CLI exposes no login command, and this runner is"
-            echo "destroyed after the build. See the 'Shortcuts CLI capabilities' section"
-            echo "of build/diagnostics/signing-environment.txt for what the CLI does"
-            echo "support."
-            ;;
-        silent_no_output)
-            echo "The CLI exited 0 but wrote nothing. That usually means the input is"
-            echo "not a valid unsigned shortcut, which would be a bug in the generator"
-            echo "rather than a credentials problem."
-            ;;
-        *)
-            echo "Unrecognised failure. The CLI output above is the primary evidence."
-            ;;
-        esac
-    } | tee -a "$DIAG_DIR/signing-result.txt"
+            break
+        fi
 
-    exit 1
-}
-
-for input in "${unsigned[@]}"; do
-    base="$(basename "$input")"
-    output="$SIGNED_DIR/$base"
-
-    echo "    signing $base"
-
-    set +e
-    sign_output="$(shortcuts sign --mode anyone --input "$input" --output "$output" 2>&1)"
-    sign_rc=$?
-    set -e
-
-    [[ -n "$sign_output" ]] && printf '%s\n' "$sign_output"
-
-    if [[ "$sign_rc" -ne 0 ]]; then
-        report_signing_failure "$base" "$sign_rc" "$sign_output"
-    fi
-
-    # The CLI has been reported to exit 0 while writing nothing, so the exit
-    # code alone is not enough to call this a success.
-    if [[ ! -s "$output" ]]; then
-        report_signing_failure "$base" "$sign_rc" "$sign_output"
-    fi
-done
-
-signed=("$SIGNED_DIR"/*.shortcut)
-if [[ ${#signed[@]} -eq 0 ]]; then
-    die "Signing loop completed but build/signed is empty."
-fi
-
-if [[ ${#signed[@]} -ne ${#unsigned[@]} ]]; then
-    die "Signed ${#signed[@]} file(s) but generated ${#unsigned[@]}. Counts must match."
+        echo "    signed $base"
+        SIGNED_COUNT=$((SIGNED_COUNT + 1))
+    done
 fi
 
 # --- Summary --------------------------------------------------------------
 echo ""
-echo "Successfully generated and signed ${#signed[@]} shortcuts:"
+echo "Generated ${#unsigned[@]} unsigned shortcut(s):"
 echo ""
-for file in "${signed[@]}"; do
+for file in "${unsigned[@]}"; do
     echo "  ${file#"$REPO_ROOT"/}"
 done
+
+echo ""
+if [[ "$SIGNED_COUNT" -gt 0 ]]; then
+    signed=("$SIGNED_DIR"/*.shortcut)
+    echo "Signed ${#signed[@]} shortcut(s):"
+    echo ""
+    for file in "${signed[@]}"; do
+        echo "  ${file#"$REPO_ROOT"/}"
+    done
+else
+    echo "Signing $SIGNING_NOTE"
+    echo ""
+    echo "This is not a failure. Unsigned shortcuts install on iOS with"
+    echo "Settings > Shortcuts > Private Sharing turned on."
+fi
 echo ""

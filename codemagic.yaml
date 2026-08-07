@@ -1,17 +1,11 @@
 workflows:
   shortcut-signer:
-    name: Build & Sign Shortcuts
-    instance_type: mac_mini_m2
+    name: Build Shortcuts
+    # Linux, not macOS. Generation is pure Python, and signing is impossible on
+    # any CI runner: macOS VMs cannot hold an iCloud session, which `shortcuts
+    # sign` requires. Building here costs no Mac minutes.
+    instance_type: linux_x2
     max_build_duration: 30
-
-    # No environment.ios_signing here. Codemagic rejects a bare certificate:
-    #
-    #   Either distribution profile and bundle identifier or provisioning
-    #   profiles (and optionally certificates) must be provided.
-    #
-    # Satisfying that means declaring a bundle ID and provisioning profile for
-    # an app this repo does not contain. The certificate cannot be loaded
-    # without app-signing scaffolding, so that experiment ends here.
 
     # Every push to main builds. Manual runs from the Codemagic UI are
     # unaffected by this section and keep working.
@@ -37,21 +31,11 @@ workflows:
           - '**/*.md'
 
     scripts:
-      # Reports the OS, the Shortcuts CLI and its documented options, the code
-      # signing identities the certificate injection actually delivered, and the
-      # iCloud account count. Never fails the build — a missing tool is itself a
-      # result, and the next step is what enforces success.
-      - name: Diagnose Apple signing environment
-        script: |
-          chmod +x scripts/diagnose_signing_env.sh
-          ./scripts/diagnose_signing_env.sh
-
-      - name: Build and sign shortcuts
+      - name: Build shortcuts
         script: |
           chmod +x scripts/build_and_sign.sh
           ./scripts/build_and_sign.sh
 
     artifacts:
+      - build/unsigned/*.shortcut
       - build/signed/*.shortcut
-      # Published even when signing fails, which is the run that matters most.
-      - build/diagnostics/*.txt
