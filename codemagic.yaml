@@ -4,15 +4,14 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 30
 
-    environment:
-      # Loaded purely as an experiment: does the Apple Distribution certificate
-      # Codemagic injects have any bearing on `shortcuts sign`? Shortcut signing
-      # and app code signing may be unrelated systems, and the build log is what
-      # settles it. No provisioning profile, bundle ID or distribution type is
-      # declared, because this repo produces .shortcut files, not an .ipa.
-      ios_signing:
-        certificates:
-          - shortcuts_distribution
+    # No environment.ios_signing here. Codemagic rejects a bare certificate:
+    #
+    #   Either distribution profile and bundle identifier or provisioning
+    #   profiles (and optionally certificates) must be provided.
+    #
+    # Satisfying that means declaring a bundle ID and provisioning profile for
+    # an app this repo does not contain. The certificate cannot be loaded
+    # without app-signing scaffolding, so that experiment ends here.
 
     # Every push to main builds. Manual runs from the Codemagic UI are
     # unaffected by this section and keep working.
