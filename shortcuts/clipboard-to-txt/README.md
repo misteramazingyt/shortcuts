@@ -8,18 +8,19 @@ Two builds are included. Start with the first.
 
 | File | Writes to disk? | Use when |
 | --- | --- | --- |
-| [`Clipboard to TXT.shortcut`](https://github.com/misteramazingyt/shortcuts/raw/main/shortcuts/clipboard-to-txt/Clipboard%20to%20TXT.shortcut) | No | Default. Nothing is left behind. |
-| [`Clipboard to TXT (Save to Files).shortcut`](https://github.com/misteramazingyt/shortcuts/raw/main/shortcuts/clipboard-to-txt/Clipboard%20to%20TXT%20%28Save%20to%20Files%29.shortcut) | `iCloud Drive/Shortcuts/Clipboard.txt` | Fallback, if some app refuses the in-memory file. |
+| [`Clipboard to TXT.shortcut`](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/shortcuts/clipboard-to-txt/Clipboard%20to%20TXT.shortcut) | No | Default. Nothing is left behind. |
+| [`Clipboard to TXT (Save to Files).shortcut`](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/shortcuts/clipboard-to-txt/Clipboard%20to%20TXT%20%28Save%20to%20Files%29.shortcut) | `iCloud Drive/Shortcuts/Clipboard.txt` | Fallback, if some app refuses the in-memory file. |
 
 Both produce a file named `Clipboard.txt`. The save-to-Files build overwrites the same
 path every run, so it never accumulates copies.
 
 ## Install
 
-1. Open one of the links above **in Safari, not the GitHub mobile app**. The app cannot
+1. Tap one of the links above **in Safari, not the GitHub mobile app**. The app cannot
    download binary files and shows a blank preview instead; long-press the link and
    choose *Open in Safari* if you are reading this in the app.
-2. Safari saves the file to Files. Open it from there and Shortcuts will offer to add it.
+2. Safari downloads the file. Open it from Safari's downloads, or from Files, and
+   Shortcuts will offer to add it.
 3. If iOS refuses the import, turn on **Settings → Shortcuts → Allow Untrusted
    Shortcuts** and try again. That toggle only appears once you have run at least one
    shortcut on the device, so run any shortcut first if you don't see it.

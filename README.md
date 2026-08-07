@@ -6,29 +6,22 @@ iOS Shortcuts, versioned as source and built into installable `.shortcut` files.
 
 | Shortcut | What it does | Get it | Docs |
 | --- | --- | --- | --- |
-| **Clipboard to TXT** | Turns clipboard text into a `.txt` file and opens the share sheet with it attached. Nothing is saved to disk. | [Download](https://github.com/misteramazingyt/shortcuts/raw/main/shortcuts/clipboard-to-txt/Clipboard%20to%20TXT.shortcut) | [Read](shortcuts/clipboard-to-txt/) |
-| **Clipboard to TXT (Save to Files)** | Same, but writes `iCloud Drive/Shortcuts/Clipboard.txt` first. Fallback if an app refuses the in-memory file. | [Download](https://github.com/misteramazingyt/shortcuts/raw/main/shortcuts/clipboard-to-txt/Clipboard%20to%20TXT%20%28Save%20to%20Files%29.shortcut) | [Read](shortcuts/clipboard-to-txt/) |
+| **Clipboard to TXT** | Turns clipboard text into a `.txt` file and opens the share sheet with it attached. Nothing is saved to disk. | [Download](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/shortcuts/clipboard-to-txt/Clipboard%20to%20TXT.shortcut) | [Read](shortcuts/clipboard-to-txt/) |
+| **Clipboard to TXT (Save to Files)** | Same, but writes `iCloud Drive/Shortcuts/Clipboard.txt` first. Fallback if an app refuses the in-memory file. | [Download](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/shortcuts/clipboard-to-txt/Clipboard%20to%20TXT%20%28Save%20to%20Files%29.shortcut) | [Read](shortcuts/clipboard-to-txt/) |
 
 ## Installing
 
-**Open these links in Safari, not the GitHub app.** If you are reading this in the
-GitHub mobile app, long-press a **Download** link and choose *Open in Safari* — the app
-cannot download binary files and will show a blank preview instead.
+Tap a **Download** link on your iPhone or iPad. Safari saves the file, and opening it
+from Safari's downloads (or from Files) hands it to Shortcuts, which offers to add it.
 
-In Safari, signed in to GitHub, tapping a Download link saves the file straight to
-Files. Open it from there and Shortcuts will offer to add it.
+Two things that trip this up:
 
-These are unsigned shortcuts, so iOS may ask you to enable **Settings → Shortcuts →
-Allow Untrusted Shortcuts** first. That toggle only appears after you have run at least
-one shortcut on the device.
-
-### Why the links look like that
-
-While this repo is private, `raw.githubusercontent.com` returns 404 — it needs an access
-token in the URL. The `github.com/.../raw/...` form used above authenticates with your
-browser session instead, so it works while the repo is private. It keeps working if the
-repo is ever made public, at which point the links also stop requiring a signed-in
-session and anyone can install from them.
+- **Use Safari, not the GitHub mobile app.** The app cannot download binary files and
+  shows a blank preview instead. If you are reading this in the app, long-press a
+  Download link and choose *Open in Safari*.
+- These are unsigned shortcuts, so iOS may ask you to enable **Settings → Shortcuts →
+  Allow Untrusted Shortcuts** first. That toggle only appears after you have run at
+  least one shortcut on the device.
 
 Every shortcut's docs also list its actions in order, so you can rebuild it by hand in
 the Shortcuts app instead of importing anything.
