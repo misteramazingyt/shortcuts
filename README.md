@@ -29,44 +29,33 @@ the Shortcuts app instead of importing anything.
 
 ## Building and signing Apple Shortcuts
 
-Shortcut source lives in this repository, and signed builds are produced by Codemagic
-on a macOS runner. The lifecycle:
+Shortcut source lives in this repository. Generating the `.shortcut` files is pure
+Python and runs anywhere. **Signing is the hard part** — Apple's `shortcuts sign`
+requires an Apple Account session that no CI runner can hold, because macOS VMs cannot
+sign into iCloud. Signing therefore needs real Apple hardware, at least once.
 
-1. Edit a shortcut's source under `shortcuts/<name>/`.
-2. Push to `main`.
-3. Codemagic starts a Mac mini M2 runner automatically.
-4. `scripts/build_and_sign.sh` runs every generator, writing unsigned files to
-   `build/unsigned/`.
-5. Apple's `shortcuts sign --mode anyone` signs each one into `build/signed/`.
-6. The signed `.shortcut` files are downloadable from that build's **Artifacts** in
-   Codemagic.
+The whole plan, step by step, is in **[HANDBOOK.md](HANDBOOK.md)** — from powering on a
+Mac to running a signed shortcut on your phone. In short:
 
-Signed files are artifacts only — CI never commits them back, which would retrigger
-itself. Source belongs in Git, build products belong in Codemagic.
+- **Phase 1:** on a Mac signed into iCloud, `scripts/sign_on_mac.sh` signs everything
+  with Apple's own CLI and commits the results to `signed/`. Guaranteed to work.
+- **Phase 2 (experimental):** `tools/appleid-key-dumper-macos/` extracts an Apple ID
+  signing identity so [`shortcut-sign`](https://github.com/0xilis/shortcut-sign) can
+  sign on Linux. If it works, GitHub Actions signs every future push for free.
 
-### Signing status: unresolved
+### CI
 
-`shortcuts sign` currently fails on the runner with *"In order to do this, you must be
-signed into iCloud."* An iCloud session cannot be established non-interactively — sign-in
-is two-factor gated, the CLI has no login command, and the runner is destroyed after each
-build.
+`.github/workflows/build.yml` runs on every push to `main`:
 
-Codemagic injects an Apple Distribution certificate (`environment.ios_signing`) so the
-build can test whether app code signing and shortcut signing are the same mechanism. They
-may well not be. Every build publishes `build/diagnostics/signing-environment.txt`,
-recording the CLI's documented options and which signing identities actually reached the
-machine, plus `signing-result.txt` classifying any failure:
+1. `scripts/build_and_sign.sh` generates unsigned shortcuts and uploads them as an
+   artifact.
+2. If the secrets `APPLE_SIGNING_KEY` and `APPLE_AUTH_DATA` exist (set after Phase 2),
+   it builds `shortcut-sign`, signs via `scripts/ci_sign.sh`, and commits `signed/`.
+3. Without those secrets it just publishes the unsigned artifact — no failure.
 
-| Verdict | Meaning |
-| --- | --- |
-| `CASE A` | No Apple identity reached the runner; certificate injection is the first thing to fix. |
-| `CASE B` | An identity is installed and `shortcuts sign` rejects it anyway — the two systems do not bridge. |
-| `CASE C` | The CLI exposes a way to select an installed certificate, and the script was not using it. |
-
-Neither report contains keys, passwords or tokens.
-
-Documentation-only pushes are skipped so they do not spend Mac minutes. Any change to
-shortcut source, a generator, the build script, or `codemagic.yaml` builds normally.
+The signing secrets never leak: decoded only to temp files readable by the build user,
+shredded on exit, never printed, masked in logs. Full security model in
+[HANDBOOK.md Part 3](HANDBOOK.md). Installable, signed files live in [`signed/`](signed).
 
 ### Running it locally
 
@@ -74,20 +63,19 @@ shortcut source, a generator, the build script, or `codemagic.yaml` builds norma
 ./scripts/build_and_sign.sh
 ```
 
-Generation works on any OS with Python 3. **Signing requires macOS** — `shortcuts` is
-an Apple CLI built into macOS 12 and later with no Linux or Windows equivalent. On a
-non-Mac the script generates `build/unsigned/` and then stops with an explicit error
-rather than appearing to succeed.
-
-Signing uses `--mode anyone`. The alternative, `people-who-know-me`, only lets people
-who have the signer in their Contacts import the file.
+Generation works on any OS with Python 3. Signing is best effort: on a Mac signed into
+iCloud it runs `shortcuts sign --mode anyone`; anywhere else it skips signing and leaves
+the unsigned files in `build/unsigned/`. `--mode anyone` rather than `people-who-know-me`,
+which would restrict import to the signer's contacts.
 
 ## Layout
 
 ```
-codemagic.yaml           CI definition: trigger, build, publish artifacts
+.github/workflows/     CI: build unsigned always, sign when secrets exist
 scripts/
-    build_and_sign.sh    the single build + sign entrypoint
+    build_and_sign.sh    generate all shortcuts (+ sign locally on macOS)
+    sign_on_mac.sh       Phase 1: sign with Apple's CLI on a real Mac
+    ci_sign.sh           sign on Linux with shortcut-sign + secrets
 shortcuts/<name>/
     README.md            what it does, how to install, how it works
     build.py             the shortcut's definition in Python — the source of truth
@@ -115,7 +103,7 @@ directs the generators at `build/unsigned/` instead, so signing cannot modify so
 3. Write `shortcuts/<name>/README.md`.
 4. Add a row to the table above.
 
-Nothing needs to change in `codemagic.yaml` or `build_and_sign.sh` — any
+Nothing needs to change in the CI workflow or `build_and_sign.sh` — any
 `shortcuts/*/build.py` is discovered and built automatically.
 
 Builds are deterministic — hold action UUIDs fixed rather than generating them at build

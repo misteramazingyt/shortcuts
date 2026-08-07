@@ -1,0 +1,75 @@
+name: Build & sign shortcuts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      # Deliberately excludes signed/ so the commit this workflow makes cannot
+      # trigger the workflow again.
+      - 'shortcuts/**'
+      - 'tools/**'
+      - 'scripts/**'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+# Least privilege: the only write this needs is committing signed/ back.
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate unsigned shortcuts
+        run: ./scripts/build_and_sign.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-shortcuts
+          path: build/unsigned/*.shortcut
+
+      # Are the signing secrets configured? Mapped to env and tested by length,
+      # so the secret value is never interpolated into a command line.
+      - name: Check for signing secrets
+        id: secrets
+        env:
+          KEY: ${{ secrets.APPLE_SIGNING_KEY }}
+        run: |
+          if [ -n "$KEY" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No signing secrets set — skipping signing. See HANDBOOK.md Part 2."
+          fi
+
+      - name: Build shortcut-sign
+        if: steps.secrets.outputs.present == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential git pkg-config libssl-dev libplist-dev
+          git clone --recursive https://github.com/0xilis/shortcut-sign /tmp/shortcut-sign
+          make -C /tmp/shortcut-sign
+          echo "/tmp/shortcut-sign" >> "$GITHUB_PATH"
+
+      - name: Sign shortcuts
+        if: steps.secrets.outputs.present == 'true'
+        env:
+          APPLE_SIGNING_KEY: ${{ secrets.APPLE_SIGNING_KEY }}
+          APPLE_AUTH_DATA: ${{ secrets.APPLE_AUTH_DATA }}
+        run: ./scripts/ci_sign.sh
+
+      - name: Commit signed shortcuts
+        if: steps.secrets.outputs.present == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add signed
+          if git diff --cached --quiet; then
+            echo "No change to signed shortcuts."
+          else
+            git commit -m "Sign shortcuts [skip ci]"
+            git push
+          fi

@@ -54,7 +54,7 @@ if [[ -s "$OUT_DIR/privateKey.bin" && -s "$OUT_DIR/authData.plist" ]]; then
     ls -l "$OUT_DIR/privateKey.bin" "$OUT_DIR/authData.plist"
     echo ""
     echo "These are secret. Do not commit them. Base64 them into GitHub Actions"
-    echo "secrets APPLE_SIGNING_KEY and APPLE_AUTH_DATA — see ../../scripts/mac_day.md."
+    echo "secrets APPLE_SIGNING_KEY and APPLE_AUTH_DATA — see HANDBOOK.md Step 11."
 else
     echo "Did not produce both files. Read the errors above against README.md." >&2
     exit 1
