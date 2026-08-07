@@ -5,3 +5,13 @@ build/
 __pycache__/
 *.pyc
 .DS_Store
+
+# Apple ID signing material. NEVER commit these — the private key is your
+# Apple identity, and anyone holding it can sign as you. They belong in CI
+# secrets, not in git.
+*.key
+*.p12
+*.p8
+auth_data*
+appleid-*
+signing-identity/
