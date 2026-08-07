@@ -26,6 +26,27 @@ Two things that trip this up:
 Every shortcut's docs also list its actions in order, so you can rebuild it by hand in
 the Shortcuts app instead of importing anything.
 
+## Signing
+
+The committed files are unsigned, which is why iOS asks for **Allow Untrusted
+Shortcuts**. To sign them, on a Mac signed into iCloud:
+
+```sh
+tools/sign.sh
+```
+
+That runs `shortcuts sign --mode anyone` over every built `.shortcut` and replaces it
+in place. Commit the result.
+
+This cannot run on a GitHub-hosted runner. Unlike Xcode signing, there is no
+certificate to inject as a secret — `shortcuts sign` uses the Apple ID logged into the
+machine and sends a copy to Apple for validation, and signing a runner into iCloud
+non-interactively is blocked by two-factor auth. Automating it needs a self-hosted
+macOS runner that stays logged in.
+
+Use `anyone` rather than `people-who-know-me`: the latter only lets people who have the
+signer in their Contacts import the file.
+
 ## Layout
 
 ```
