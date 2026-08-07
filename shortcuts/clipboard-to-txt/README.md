@@ -16,9 +16,12 @@ path every run, so it never accumulates copies.
 
 ## Install
 
-1. Open the link on your iPhone or iPad and let it download.
-2. Open it from Files. Shortcuts will offer to add it.
-3. If iOS refuses the import, turn on **Settings → Shortcuts → Allow Untrusted
+1. On your iPhone or iPad, signed in to GitHub, tap one of the file links above.
+2. Tap **Download raw file** (the ⤓ icon at the top right of the file box). While this
+   repo is private, `raw.githubusercontent.com` links return 404 without an access
+   token, so this is the way to get the file onto the device.
+3. Open the download from Files. Shortcuts will offer to add it.
+4. If iOS refuses the import, turn on **Settings → Shortcuts → Allow Untrusted
    Shortcuts** and try again. That toggle only appears once you have run at least one
    shortcut on the device, so run any shortcut first if you don't see it.
 

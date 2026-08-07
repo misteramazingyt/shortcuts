@@ -4,19 +4,26 @@ iOS Shortcuts, versioned as source and built into installable `.shortcut` files.
 
 ## The shortcuts
 
-| Shortcut | What it does | Install | Docs |
+| Shortcut | What it does | Get it | Docs |
 | --- | --- | --- | --- |
-| **Clipboard to TXT** | Turns clipboard text into a `.txt` file and opens the share sheet with it attached. Nothing is saved to disk. | [Download](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/shortcuts/clipboard-to-txt/Clipboard%20to%20TXT.shortcut) | [Read](shortcuts/clipboard-to-txt/) |
-| **Clipboard to TXT (Save to Files)** | Same, but writes `iCloud Drive/Shortcuts/Clipboard.txt` first. Fallback if an app refuses the in-memory file. | [Download](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/shortcuts/clipboard-to-txt/Clipboard%20to%20TXT%20%28Save%20to%20Files%29.shortcut) | [Read](shortcuts/clipboard-to-txt/) |
+| **Clipboard to TXT** | Turns clipboard text into a `.txt` file and opens the share sheet with it attached. Nothing is saved to disk. | [Download](shortcuts/clipboard-to-txt/Clipboard%20to%20TXT.shortcut) | [Read](shortcuts/clipboard-to-txt/) |
+| **Clipboard to TXT (Save to Files)** | Same, but writes `iCloud Drive/Shortcuts/Clipboard.txt` first. Fallback if an app refuses the in-memory file. | [Download](shortcuts/clipboard-to-txt/Clipboard%20to%20TXT%20%28Save%20to%20Files%29.shortcut) | [Read](shortcuts/clipboard-to-txt/) |
 
 ## Installing
 
-Open a download link on your iPhone or iPad, then open the downloaded file from Files
-and let Shortcuts add it.
+1. On your iPhone or iPad, signed in to GitHub, tap a **Download** link above. It opens
+   the file's page here.
+2. Tap **Download raw file** (the ⤓ icon, top right of the file box).
+3. Open the download from Files and let Shortcuts add it.
 
-These are unsigned, so iOS may ask you to enable **Settings → Shortcuts → Allow
-Untrusted Shortcuts** first. That toggle only appears after you have run at least one
-shortcut on the device.
+While this repo is private, `raw.githubusercontent.com` links do not work — they return
+404 without an access token, which is why the links above point at the file pages
+instead. If you make the repo public, direct one-tap links become possible in the form
+`https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/<path>`.
+
+These shortcuts are unsigned, so iOS may ask you to enable **Settings → Shortcuts →
+Allow Untrusted Shortcuts** first. That toggle only appears after you have run at least
+one shortcut on the device.
 
 Every shortcut's docs also list its actions in order, so you can rebuild it by hand in
 the Shortcuts app instead of importing anything.
