@@ -12,6 +12,8 @@ __pycache__/
 *.key
 *.p12
 *.p8
+authData.plist
+privateKey.bin
 auth_data*
-appleid-*
+appleid-dump/
 signing-identity/
