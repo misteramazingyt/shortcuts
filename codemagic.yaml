@@ -4,6 +4,16 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 30
 
+    environment:
+      # Loaded purely as an experiment: does the Apple Distribution certificate
+      # Codemagic injects have any bearing on `shortcuts sign`? Shortcut signing
+      # and app code signing may be unrelated systems, and the build log is what
+      # settles it. No provisioning profile, bundle ID or distribution type is
+      # declared, because this repo produces .shortcut files, not an .ipa.
+      ios_signing:
+        certificates:
+          - shortcuts_distribution
+
     # Every push to main builds. Manual runs from the Codemagic UI are
     # unaffected by this section and keep working.
     triggering:
@@ -28,11 +38,14 @@ workflows:
           - '**/*.md'
 
     scripts:
-      - name: Verify Shortcuts CLI
+      # Reports the OS, the Shortcuts CLI and its documented options, the code
+      # signing identities the certificate injection actually delivered, and the
+      # iCloud account count. Never fails the build — a missing tool is itself a
+      # result, and the next step is what enforces success.
+      - name: Diagnose Apple signing environment
         script: |
-          sw_vers
-          command -v shortcuts
-          shortcuts help
+          chmod +x scripts/diagnose_signing_env.sh
+          ./scripts/diagnose_signing_env.sh
 
       - name: Build and sign shortcuts
         script: |
@@ -41,3 +54,5 @@ workflows:
 
     artifacts:
       - build/signed/*.shortcut
+      # Published even when signing fails, which is the run that matters most.
+      - build/diagnostics/*.txt

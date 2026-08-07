@@ -44,6 +44,27 @@ on a macOS runner. The lifecycle:
 Signed files are artifacts only — CI never commits them back, which would retrigger
 itself. Source belongs in Git, build products belong in Codemagic.
 
+### Signing status: unresolved
+
+`shortcuts sign` currently fails on the runner with *"In order to do this, you must be
+signed into iCloud."* An iCloud session cannot be established non-interactively — sign-in
+is two-factor gated, the CLI has no login command, and the runner is destroyed after each
+build.
+
+Codemagic injects an Apple Distribution certificate (`environment.ios_signing`) so the
+build can test whether app code signing and shortcut signing are the same mechanism. They
+may well not be. Every build publishes `build/diagnostics/signing-environment.txt`,
+recording the CLI's documented options and which signing identities actually reached the
+machine, plus `signing-result.txt` classifying any failure:
+
+| Verdict | Meaning |
+| --- | --- |
+| `CASE A` | No Apple identity reached the runner; certificate injection is the first thing to fix. |
+| `CASE B` | An identity is installed and `shortcuts sign` rejects it anyway — the two systems do not bridge. |
+| `CASE C` | The CLI exposes a way to select an installed certificate, and the script was not using it. |
+
+Neither report contains keys, passwords or tokens.
+
 Documentation-only pushes are skipped so they do not spend Mac minutes. Any change to
 shortcut source, a generator, the build script, or `codemagic.yaml` builds normally.
 
