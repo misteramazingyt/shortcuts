@@ -1,13 +1,43 @@
 workflows:
   shortcut-signer:
-    name: Shortcut Signer
+    name: Build & Sign Shortcuts
     instance_type: mac_mini_m2
+    max_build_duration: 30
+
+    # Every push to main builds. Manual runs from the Codemagic UI are
+    # unaffected by this section and keep working.
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+
+    # Documentation-only pushes should not spend Mac minutes. Codemagic always
+    # treats codemagic.yaml itself as part of the changeset, so edits to this
+    # file still trigger a build despite the '.' include.
+    #
+    # Note: the first build after this setting is introduced runs regardless of
+    # the condition. Skipping only begins after one successful build.
+    when:
+      changeset:
+        includes:
+          - '.'
+        excludes:
+          - '**/*.md'
 
     scripts:
-      - name: Check Shortcuts CLI
+      - name: Verify Shortcuts CLI
         script: |
-          echo "macOS:"
           sw_vers
-          echo "Shortcuts CLI:"
-          which shortcuts
+          command -v shortcuts
           shortcuts help
+
+      - name: Build and sign shortcuts
+        script: |
+          chmod +x scripts/build_and_sign.sh
+          ./scripts/build_and_sign.sh
+
+    artifacts:
+      - build/signed/*.shortcut
