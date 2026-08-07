@@ -1,0 +1,13 @@
+workflows:
+  shortcut-signer:
+    name: Shortcut Signer
+    instance_type: mac_mini_m2
+
+    scripts:
+      - name: Check Shortcuts CLI
+        script: |
+          echo "macOS:"
+          sw_vers
+          echo "Shortcuts CLI:"
+          which shortcuts
+          shortcuts help
