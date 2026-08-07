@@ -19,11 +19,10 @@ Two things that trip this up:
 - **Use Safari, not the GitHub mobile app.** The app cannot download binary files and
   shows a blank preview instead. If you are reading this in the app, long-press a
   Download link and choose *Open in Safari*.
-- These are unsigned shortcuts, so iOS needs **Settings → Shortcuts → Allow Untrusted
-  Shortcuts** turned on. **That toggle is invisible until you have run at least one
-  shortcut on the device** — run anything from the Gallery once and it appears. A
-  missing toggle is the usual reason an import looks like it was rejected for being
-  unsigned.
+- These are unsigned shortcuts, so iOS needs **Settings → Shortcuts → Private Sharing**
+  turned on. On iOS 26 and later that toggle replaced the old *Allow Untrusted
+  Shortcuts* setting; on earlier versions look for the old name, which stays hidden
+  until you have run at least one shortcut on the device.
 
 Every shortcut's docs also list its actions in order, so you can rebuild it by hand in
 the Shortcuts app instead of importing anything.
