@@ -46,13 +46,24 @@ jobs:
 
       - name: Build shortcut-sign
         if: steps.secrets.outputs.present == 'true'
+        env:
+          # Pinned so a change upstream can never silently alter what handles the
+          # signing key. Bump deliberately after reviewing the diff.
+          SHORTCUT_SIGN_REF: a6b422caad939fc86271e31a9d24fce163455489
         run: |
+          # Matches shortcut-sign's own CI (clang, libplist-dev, make); libssl-dev
+          # and zlib1g-dev cover -lssl/-lcrypto/-lz, which its Makefile links.
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential git pkg-config libssl-dev libplist-dev
-          git clone --recursive https://github.com/0xilis/shortcut-sign /tmp/shortcut-sign
+            clang make git libplist-dev libssl-dev zlib1g-dev
+          git clone https://github.com/0xilis/shortcut-sign /tmp/shortcut-sign
+          git -C /tmp/shortcut-sign checkout --quiet "$SHORTCUT_SIGN_REF"
+          git -C /tmp/shortcut-sign submodule update --init --recursive
           make -C /tmp/shortcut-sign
-          echo "/tmp/shortcut-sign" >> "$GITHUB_PATH"
+          # The Makefile emits the binary here, not at the repo root.
+          BIN=/tmp/shortcut-sign/build/usr/bin/shortcut-sign
+          test -x "$BIN" || { echo "ERROR: shortcut-sign not built at $BIN"; exit 1; }
+          echo "/tmp/shortcut-sign/build/usr/bin" >> "$GITHUB_PATH"
 
       - name: Sign shortcuts
         if: steps.secrets.outputs.present == 'true'
