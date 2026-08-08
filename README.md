@@ -12,6 +12,12 @@ iOS Shortcuts, versioned as source and built into installable `.shortcut` files.
 > The **Download** links serve the **signed** builds from [`signed/`](signed), produced
 > automatically by CI. The unsigned source plists live under each shortcut's folder.
 
+**Signing test (temporary):** [**Control (Golden)**](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Control%20%28Golden%29.shortcut)
+is a known-importable shortcut from Apple's ecosystem, signed by the same pipeline. If it
+imports on your device but Clipboard to TXT does not, the fault is our generated shortcut;
+if it too imports as "invalid", the fault is the signing method. Import both to tell them
+apart.
+
 ## Installing
 
 Tap a **Download** link on your iPhone or iPad. Safari saves the file, and opening it
