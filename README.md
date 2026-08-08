@@ -8,15 +8,10 @@ iOS Shortcuts, versioned as source and built into installable `.shortcut` files.
 | --- | --- | --- | --- |
 | **Clipboard to TXT** | Turns clipboard text into a `.txt` file and opens the share sheet with it attached. Nothing is saved to disk. | [Download](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Clipboard%20to%20TXT.shortcut) | [Read](shortcuts/clipboard-to-txt/) |
 | **Clipboard to TXT (Save to Files)** | Same, but writes `iCloud Drive/Shortcuts/Clipboard.txt` first. Fallback if an app refuses the in-memory file. | [Download](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Clipboard%20to%20TXT%20%28Save%20to%20Files%29.shortcut) | [Read](shortcuts/clipboard-to-txt/) |
+| **Control (Golden)** — _signing test_ | A known-importable Apple-ecosystem shortcut, signed by the same pipeline. Import it next to Clipboard to TXT: if this one works and that one doesn't, the fault is our shortcut; if both say "invalid", the fault is the signing method. | [Download](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Control%20%28Golden%29.shortcut) | [Read](shortcuts/_control-golden/) |
 
 > The **Download** links serve the **signed** builds from [`signed/`](signed), produced
 > automatically by CI. The unsigned source plists live under each shortcut's folder.
-
-**Signing test (temporary):** [**Control (Golden)**](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Control%20%28Golden%29.shortcut)
-is a known-importable shortcut from Apple's ecosystem, signed by the same pipeline. If it
-imports on your device but Clipboard to TXT does not, the fault is our generated shortcut;
-if it too imports as "invalid", the fault is the signing method. Import both to tell them
-apart.
 
 ## Installing
 
