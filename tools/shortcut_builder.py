@@ -13,10 +13,12 @@ an action's output into a text field, for example) use `text_with_variable`.
 
 import plistlib
 
-# Ships with iOS 17-era Shortcuts. Anything newer than the minimum below will
-# open these files; the version string is informational.
-CLIENT_VERSION = "2607.0.6"
-MINIMUM_CLIENT_VERSION = 900
+# Match the top-level fields of a real, known-importable shortcut (the Shortcuts
+# Playground golden corpus). Those files carry a client release + version and an
+# empty icon image-data blob, and omit the minimum-version / quick-action /
+# output-fallback keys we had been adding.
+CLIENT_RELEASE = "2.1.1"
+CLIENT_VERSION = "736"
 
 # Every content type Shortcuts knows about, so a shortcut will accept whatever
 # is handed to it rather than refusing input it could have coerced.
@@ -97,26 +99,26 @@ def action_output_input(uuid, output_name):
 
 
 def shortcut(actions, glyph_number=59511, start_color=463140863, workflow_types=None):
-    """Wrap actions in the top-level dictionary the Shortcuts app expects."""
+    """Wrap actions in the top-level dictionary, matching a golden shortcut.
+
+    Deliberately the exact key set of a known-importable shortcut: actions, the
+    client release/version pair, an icon carrying an empty image-data blob, the
+    import-questions and input-content-item-classes arrays, and workflow types.
+    Nothing else — extra keys are what distinguished our earlier, rejected files.
+    """
     return {
         "WFWorkflowActions": actions,
+        "WFWorkflowClientRelease": CLIENT_RELEASE,
         "WFWorkflowClientVersion": CLIENT_VERSION,
-        "WFWorkflowMinimumClientVersion": MINIMUM_CLIENT_VERSION,
-        "WFWorkflowMinimumClientVersionString": str(MINIMUM_CLIENT_VERSION),
         "WFWorkflowIcon": {
             "WFWorkflowIconGlyphNumber": glyph_number,
+            # Empty, but present: golden shortcuts always carry this key.
+            "WFWorkflowIconImageData": b"",
             "WFWorkflowIconStartColor": start_color,
         },
         "WFWorkflowImportQuestions": [],
         "WFWorkflowInputContentItemClasses": ALL_INPUT_CONTENT_ITEM_CLASSES,
-        # Real shortcuts also declare their output classes and an output-fallback
-        # flag; match them and drop WFWorkflowHasOutputParameters, which a real
-        # extracted shortcut does not carry.
-        "WFWorkflowOutputContentItemClasses": [],
         "WFWorkflowTypes": workflow_types or [],
-        "WFQuickActionSurfaces": [],
-        "WFWorkflowHasOutputFallback": False,
-        "WFWorkflowHasShortcutInputVariables": False,
     }
 
 
