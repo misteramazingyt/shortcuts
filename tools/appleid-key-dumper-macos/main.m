@@ -99,18 +99,29 @@ int main(int argc, char **argv) {
         CFDataRef data = SecKeyCopyExternalRepresentation(pubKey, &error);
         NSData *signature = (__bridge NSData *)SecKeyCreateSignature(privateKey, kSecKeyAlgorithmRSASignatureMessagePSSSHA256, data, &error);
 
-        /* Generate auth data */
-        NSMutableDictionary *dict = [NSMutableDictionary dictionaryWithDictionary:@{
+        /* Generate auth data.
+         *
+         * This MUST be a plain property list: shortcut-sign and iOS read the
+         * certificate chain from the top level. The upstream tool archived this
+         * with NSKeyedArchiver, which buries the chain inside an object graph so
+         * the signature ends up with "no cert chain" and iOS rejects the file.
+         * The validation record is stored as its raw data blob, not the object,
+         * so the whole dict is plist-serializable. */
+        NSDictionary *dict = @{
             @"AppleIDCertificateChain" : @[
                 (__bridge NSData *)SecCertificateCopyData(cert),
                 (__bridge NSData *)SecCertificateCopyData(intercert),
             ],
             @"SigningPublicKey" : signingPublicKey,
             @"SigningPublicKeySignature" : signature,
-            @"AppleIDValidationRecord" : [account validationRecord],
-        }];
+            @"AppleIDValidationRecord" : [[account validationRecord] data],
+        };
 
-        NSData *authData = [NSKeyedArchiver archivedDataWithRootObject:dict];
+        NSData *authData = [NSPropertyListSerialization
+            dataWithPropertyList:dict
+                          format:NSPropertyListBinaryFormat_v1_0
+                         options:0
+                           error:NULL];
 
         /* Ensure the output directory exists. */
         mkdir([dir UTF8String], 0755);

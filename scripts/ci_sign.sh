@@ -57,6 +57,16 @@ if [[ ! -s "$KEYFILE" || ! -s "$AUTHFILE" ]]; then
     exit 1
 fi
 
+# The dumper saved the auth as an NSKeyedArchiver wrapper; shortcut-sign and iOS
+# need a plain plist with the cert chain at the top level. Normalize it here so
+# the certificate chain is reachable — otherwise every signature has "no cert
+# chain" and iOS rejects the shortcut as invalid. Idempotent: an already-plain
+# auth passes through unchanged.
+NORM_AUTH="$(mktemp)"
+cleanup_norm() { shred -u "$NORM_AUTH" 2>/dev/null || rm -f "$NORM_AUTH"; }
+trap 'cleanup; cleanup_norm' EXIT INT TERM
+python3 "$REPO_ROOT/scripts/normalize_auth.py" "$AUTHFILE" "$NORM_AUTH"
+
 rm -rf "$SIGNED_OUT"
 mkdir -p "$SIGNED_OUT"
 
@@ -65,7 +75,7 @@ for input in "${unsigned[@]}"; do
     base="$(basename "$input")"
     output="$SIGNED_OUT/$base"
 
-    if ! shortcut-sign sign -i "$input" -o "$output" -k "$KEYFILE" -a "$AUTHFILE"; then
+    if ! shortcut-sign sign -i "$input" -o "$output" -k "$KEYFILE" -a "$NORM_AUTH"; then
         echo "ERROR: shortcut-sign failed on $base" >&2
         exit 1
     fi
@@ -73,8 +83,17 @@ for input in "${unsigned[@]}"; do
         echo "ERROR: shortcut-sign produced no output for $base" >&2
         exit 1
     fi
-    echo "    signed $base"
+
+    # Prove the signature before publishing. This is the exact check that caught
+    # the broken auth format: "missing cert chain" fails here instead of silently
+    # shipping a file iOS calls invalid.
+    if ! shortcut-sign verify -i "$output" >/dev/null 2>&1; then
+        echo "ERROR: signature failed verification for $base" >&2
+        shortcut-sign verify -i "$output" 2>&1 | sed 's/^/       /' >&2
+        exit 1
+    fi
+    echo "    signed + verified $base"
 done
 
 echo ""
-echo "Signed ${#unsigned[@]} shortcut(s) into signed/."
+echo "Signed and verified ${#unsigned[@]} shortcut(s) into signed/."
