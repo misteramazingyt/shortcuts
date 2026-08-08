@@ -17,3 +17,6 @@ privateKey.bin
 auth_data*
 appleid-dump/
 signing-identity/
+
+# Generated n8n workflow JSON (deploy artifact, not source)
+n8n/**/n8n_*.json

@@ -98,6 +98,54 @@ def action_output_input(uuid, output_name):
     }
 
 
+def _text_value(value):
+    """Coerce a plain string or an (uuid, name) reference into a text token."""
+    if isinstance(value, tuple):
+        uuid, output_name = value
+        return {
+            "string": "￼",
+            "attachmentsByRange": {
+                "{0, 1}": {
+                    "Type": "ActionOutput",
+                    "OutputUUID": uuid,
+                    "OutputName": output_name,
+                }
+            },
+        }
+    return {"string": value}
+
+
+def text_token(value):
+    """A WFTextTokenString whose content is a literal string or a variable.
+
+    Pass a plain string for a literal, or an (output_uuid, output_name) tuple to
+    drop a prior action's output into the field.
+    """
+    return {"WFSerializationType": "WFTextTokenString", "Value": _text_value(value)}
+
+
+def dictionary_field(pairs):
+    """A WFDictionaryFieldValue — the serialized form of a key/value dictionary.
+
+    `pairs` is a list of (key, value); each value may be a literal string or an
+    (output_uuid, output_name) tuple for a variable. Verified against the JSON
+    body and header dictionaries of real Get-Contents-of-URL actions.
+    """
+    items = []
+    for key, value in pairs:
+        items.append(
+            {
+                "WFItemType": 0,
+                "WFKey": text_token(key),
+                "WFValue": text_token(value),
+            }
+        )
+    return {
+        "WFSerializationType": "WFDictionaryFieldValue",
+        "Value": {"WFDictionaryFieldValueItems": items},
+    }
+
+
 def shortcut(actions, glyph_number=59511, start_color=463140863, workflow_types=None):
     """Wrap actions in the top-level dictionary, matching a golden shortcut.
 
