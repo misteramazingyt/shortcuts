@@ -60,6 +60,8 @@ def text_with_variable(uuid, output_name):
 
     Shortcuts stores attachments as an object-replacement character in the
     string plus a range map pointing at the action that produced the value.
+    Verified against real shortcuts extracted with shortcut-sign: an
+    ActionOutput attachment carries Type/OutputUUID/OutputName exactly so.
     """
     return {
         "WFSerializationType": "WFTextTokenString",
@@ -72,6 +74,24 @@ def text_with_variable(uuid, output_name):
                     "OutputName": output_name,
                 }
             },
+        },
+    }
+
+
+def action_output_input(uuid, output_name):
+    """An explicit WFInput pointing at a prior action's output.
+
+    Real serialized shortcuts wire each action's input this way rather than
+    relying on the app's implicit "use previous output" convenience. Verified
+    against the WFInput on real base64encode and setitemname actions:
+    a WFTextTokenAttachment whose Value is an ActionOutput reference.
+    """
+    return {
+        "WFSerializationType": "WFTextTokenAttachment",
+        "Value": {
+            "Type": "ActionOutput",
+            "OutputUUID": uuid,
+            "OutputName": output_name,
         },
     }
 
@@ -89,9 +109,13 @@ def shortcut(actions, glyph_number=59511, start_color=463140863, workflow_types=
         },
         "WFWorkflowImportQuestions": [],
         "WFWorkflowInputContentItemClasses": ALL_INPUT_CONTENT_ITEM_CLASSES,
+        # Real shortcuts also declare their output classes and an output-fallback
+        # flag; match them and drop WFWorkflowHasOutputParameters, which a real
+        # extracted shortcut does not carry.
+        "WFWorkflowOutputContentItemClasses": [],
         "WFWorkflowTypes": workflow_types or [],
         "WFQuickActionSurfaces": [],
-        "WFWorkflowHasOutputParameters": False,
+        "WFWorkflowHasOutputFallback": False,
         "WFWorkflowHasShortcutInputVariables": False,
     }
 

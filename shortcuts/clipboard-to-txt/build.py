@@ -29,12 +29,25 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "tools"))
 
-from shortcut_builder import action, shortcut, text_with_variable, write_shortcut
+from shortcut_builder import (
+    action,
+    action_output_input,
+    shortcut,
+    text_with_variable,
+    write_shortcut,
+)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-# Fixed so rebuilds are byte-identical instead of churning the diff.
-CLIPBOARD_UUID = "5B0F1C8A-0F7E-4D3E-9E4B-1B1A2C3D4E5F"
+# Fixed UUIDs so rebuilds are byte-identical. Each action that produces a value
+# a later action consumes needs a stable UUID to be referenced by.
+U_CLIPBOARD = "5B0F1C8A-0F7E-4D3E-9E4B-1B1A2C3D4E5F"
+U_TEXT = "5B0F1C8A-0F7E-4D3E-9E4B-2B1A2C3D4E5F"
+U_ENCODE = "5B0F1C8A-0F7E-4D3E-9E4B-3B1A2C3D4E5F"
+U_DECODE = "5B0F1C8A-0F7E-4D3E-9E4B-4B1A2C3D4E5F"
+U_SAVE = "5B0F1C8A-0F7E-4D3E-9E4B-5B1A2C3D4E5F"
+U_OPEN = "5B0F1C8A-0F7E-4D3E-9E4B-6B1A2C3D4E5F"
+U_NAME = "5B0F1C8A-0F7E-4D3E-9E4B-7B1A2C3D4E5F"
 
 FILENAME = "Clipboard.txt"
 ICLOUD_PATH = "Shortcuts/" + FILENAME
@@ -45,28 +58,38 @@ COLOR = 4251333119
 
 
 def get_clipboard_as_text():
-    """Get Clipboard, then funnel it through a Text action.
+    """Get Clipboard, then coerce it to a string through a Text action.
 
-    The Text action is not redundant: it coerces whatever the clipboard holds
-    into a string, so a copied URL or rich text lands in the .txt as plain text
-    instead of being carried along as its original content type.
+    The Text action isn't redundant: it flattens a copied URL or rich text to
+    plain text, so the file ends up as real .txt rather than the original type.
+    Inputs are wired explicitly (WFInput / WFTextActionText) the way real
+    serialized shortcuts do, not left to the app's implicit output chaining.
     """
     return [
-        action("is.workflow.actions.getclipboard", uuid=CLIPBOARD_UUID),
+        action("is.workflow.actions.getclipboard", uuid=U_CLIPBOARD),
         action(
             "is.workflow.actions.gettext",
-            {"WFTextActionText": text_with_variable(CLIPBOARD_UUID, "Clipboard")},
+            {"WFTextActionText": text_with_variable(U_CLIPBOARD, "Clipboard")},
+            uuid=U_TEXT,
         ),
     ]
 
 
-def set_name_and_share():
+def set_name_and_share(input_uuid, input_name):
     return [
         action(
             "is.workflow.actions.setitemname",
-            {"WFName": FILENAME, "WFDontIncludeFileExtension": False},
+            {
+                "WFInput": action_output_input(input_uuid, input_name),
+                "WFName": FILENAME,
+                "WFDontIncludeFileExtension": False,
+            },
+            uuid=U_NAME,
         ),
-        action("is.workflow.actions.share", {}),
+        action(
+            "is.workflow.actions.share",
+            {"WFInput": action_output_input(U_NAME, "Renamed Item")},
+        ),
     ]
 
 
@@ -75,11 +98,23 @@ def build_in_memory():
     actions += [
         action(
             "is.workflow.actions.base64encode",
-            {"WFEncodeMode": "Encode", "WFBase64LineBreakMode": "None"},
+            {
+                "WFInput": action_output_input(U_TEXT, "Text"),
+                "WFEncodeMode": "Encode",
+                "WFBase64LineBreakMode": "None",
+            },
+            uuid=U_ENCODE,
         ),
-        action("is.workflow.actions.base64encode", {"WFEncodeMode": "Decode"}),
+        action(
+            "is.workflow.actions.base64encode",
+            {
+                "WFInput": action_output_input(U_ENCODE, "Base64 Encoded"),
+                "WFEncodeMode": "Decode",
+            },
+            uuid=U_DECODE,
+        ),
     ]
-    actions += set_name_and_share()
+    actions += set_name_and_share(U_DECODE, "Base64 Encoded")
     return shortcut(actions, glyph_number=GLYPH, start_color=COLOR)
 
 
@@ -89,10 +124,12 @@ def build_save_to_files():
         action(
             "is.workflow.actions.documentpicker.save",
             {
+                "WFInput": action_output_input(U_TEXT, "Text"),
                 "WFFileDestinationPath": ICLOUD_PATH,
                 "WFAskWhereToSave": False,
                 "WFSaveFileOverwrite": True,
             },
+            uuid=U_SAVE,
         ),
         action(
             "is.workflow.actions.documentpicker.open",
@@ -101,9 +138,10 @@ def build_save_to_files():
                 "WFShowFilePicker": False,
                 "WFFileErrorIfNotFound": True,
             },
+            uuid=U_OPEN,
         ),
     ]
-    actions += set_name_and_share()
+    actions += set_name_and_share(U_OPEN, "File")
     return shortcut(actions, glyph_number=GLYPH, start_color=COLOR)
 
 
