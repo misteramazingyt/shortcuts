@@ -82,5 +82,17 @@ jobs:
             echo "No change to signed shortcuts."
           else
             git commit -m "Sign shortcuts [skip ci]"
-            git push
+            # A human push can land while this job builds shortcut-sign, moving
+            # main ahead and rejecting a plain push. Rebase onto the latest main
+            # (signed/ never conflicts with source or docs) and retry a few times.
+            pushed=false
+            for attempt in 1 2 3 4 5; do
+              if git push; then pushed=true; break; fi
+              echo "push rejected (attempt $attempt); rebasing onto origin/main"
+              git pull --rebase origin main
+            done
+            if [ "$pushed" != true ]; then
+              echo "ERROR: could not push signed shortcuts after retries" >&2
+              exit 1
+            fi
           fi
