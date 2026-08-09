@@ -12,7 +12,8 @@ Two builds are included. Start with the first.
 | [`Clipboard to TXT (Save to Files).shortcut`](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/shortcuts/clipboard-to-txt/Clipboard%20to%20TXT%20%28Save%20to%20Files%29.shortcut) | `iCloud Drive/Shortcuts/Clipboard.txt` | Fallback, if some app refuses the in-memory file. |
 
 Both produce a file named `Clipboard.txt`. The save-to-Files build overwrites the same
-path every run, so it never accumulates copies.
+path every run and then deletes the file once you finish sharing, so nothing is left
+behind in iCloud Drive.
 
 ## Install
 
@@ -42,7 +43,8 @@ The interesting part is getting a *file* out of Shortcuts without saving one:
 
 The save-to-Files build swaps steps 3–4 for **Save File** (ask-where-to-save off,
 overwrite on) followed by **Get File**, so the share sheet receives a genuine on-disk
-file. It needs iCloud Drive enabled.
+file. After the share, a **Delete Files** action (delete-immediately on) removes the
+saved file. It needs iCloud Drive enabled.
 
 ## Building it by hand
 

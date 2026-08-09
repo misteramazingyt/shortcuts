@@ -48,6 +48,7 @@ U_DECODE = "5B0F1C8A-0F7E-4D3E-9E4B-4B1A2C3D4E5F"
 U_SAVE = "5B0F1C8A-0F7E-4D3E-9E4B-5B1A2C3D4E5F"
 U_OPEN = "5B0F1C8A-0F7E-4D3E-9E4B-6B1A2C3D4E5F"
 U_NAME = "5B0F1C8A-0F7E-4D3E-9E4B-7B1A2C3D4E5F"
+U_DELETE = "5B0F1C8A-0F7E-4D3E-9E4B-8B1A2C3D4E5F"
 
 FILENAME = "Clipboard.txt"
 ICLOUD_PATH = "Shortcuts/" + FILENAME
@@ -142,6 +143,19 @@ def build_save_to_files():
         ),
     ]
     actions += set_name_and_share(U_OPEN, "File")
+    # After the share sheet is dismissed, remove the file we wrote to iCloud
+    # Drive. WFDeleteImmediatelyDelete skips the confirmation prompt; the input
+    # is the Save File action's own output, which points at the on-disk file.
+    actions += [
+        action(
+            "is.workflow.actions.file.delete",
+            {
+                "WFInput": action_output_input(U_SAVE, "Saved File"),
+                "WFDeleteImmediatelyDelete": True,
+            },
+            uuid=U_DELETE,
+        ),
+    ]
     return shortcut(actions, glyph_number=GLYPH, start_color=COLOR)
 
 
