@@ -57,6 +57,40 @@ To get it into the share sheet, open the shortcut's settings (ⓘ) and check
 **Show in Share Sheet** — the built file already asks for this, but confirm it
 survived the import.
 
+## If the Shortcuts app crashes when you open it
+
+A crash is different from a rejection, and it narrows things down. Two things
+can cause it, and one test tells them apart.
+
+First, get the app back: don't tap the shortcut again. Force-quit Shortcuts,
+then long-press its tile in the grid and **Delete** — deleting from the grid
+never opens it.
+
+Then work through these in order. Each is one download.
+
+| # | Open this | If it crashes | If it opens |
+| --- | --- | --- | --- |
+| 1 | The **unsigned** [`Upload to Imgur.shortcut`](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/shortcuts/imgur-upload/Upload%20to%20Imgur.shortcut) (needs Private Sharing on) | The plist is at fault, not the signature → test 3 | The **signature** is at fault. The unsigned file is your working copy |
+| 2 | The signed [`Control (Golden)`](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Control%20%28Golden%29.shortcut) | Signing is broken for *every* shortcut here, including ones that predate this one | Signing is fine; the fault is specific to this shortcut |
+| 3 | [`Upload to Imgur (Minimal).shortcut`](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/shortcuts/imgur-upload/Upload%20to%20Imgur%20%28Minimal%29.shortcut) | The upload action itself, not the structure around it | The If blocks, the menu, or the share-sheet type |
+
+Test 2 is what [`_control-golden`](../_control-golden/) exists for: a real Apple
+shortcut pushed through the same signing pipeline. If it crashes, nothing about
+this shortcut's contents is implicated — see
+[HANDBOOK.md](../../HANDBOOK.md), which flags CI signing as never verified
+against a device.
+
+**Upload to Imgur (Minimal)** is the same upload with everything else stripped
+out — no If, no menu, no named variables, no share-sheet type, just
+`Select Photos → Convert to JPEG → POST → link → clipboard`. It is a diagnostic
+rather than the deliverable (it converts every image to JPEG, and it always
+copies rather than asking), but if it is the one that survives, it is also a
+perfectly usable uploader. Delete both it and this section once the crash is
+pinned down.
+
+Whatever the outcome, **building it by hand always works** — see the action list
+at the end of this file. Ten actions, no import, no signature.
+
 ## The API it talks to
 
 Imgur API v3, the current documented upload path:

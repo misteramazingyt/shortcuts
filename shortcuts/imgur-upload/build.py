@@ -54,6 +54,7 @@ from shortcut_builder import (
     shortcut,
     text_item,
     text_token,
+    text_with_variable,
     variable_input,
     variable_ref,
     write_shortcut,
@@ -62,6 +63,9 @@ from shortcut_builder import (
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 OUT_NAME = "Upload to Imgur.shortcut"
+
+# A cut-down build used to bisect the crash described on build_minimal().
+MINIMAL_NAME = "Upload to Imgur (Minimal).shortcut"
 
 # Imgur API v3. POST here with the image as multipart form data.
 ENDPOINT = "https://api.imgur.com/3/upload"
@@ -99,6 +103,13 @@ U_HTTP_KEYED = "1D0F1C8A-0F7E-4D3E-9E4B-9A1A2C3D4E5F"
 U_DATA = "1D0F1C8A-0F7E-4D3E-9E4B-6A1A2C3D4E5F"
 U_LINK = "1D0F1C8A-0F7E-4D3E-9E4B-7A1A2C3D4E5F"
 U_QR = "1D0F1C8A-0F7E-4D3E-9E4B-8A1A2C3D4E5F"
+
+# The minimal build's own UUIDs, disjoint from the full build's.
+M_SELECT = "2D0F1C8A-0F7E-4D3E-9E4B-1A1A2C3D4E5F"
+M_CONVERT = "2D0F1C8A-0F7E-4D3E-9E4B-2A1A2C3D4E5F"
+M_HTTP = "2D0F1C8A-0F7E-4D3E-9E4B-3A1A2C3D4E5F"
+M_DATA = "2D0F1C8A-0F7E-4D3E-9E4B-4A1A2C3D4E5F"
+M_LINK = "2D0F1C8A-0F7E-4D3E-9E4B-5A1A2C3D4E5F"
 
 G_AUTH = "1D0F1C8A-0F7E-4D3E-9E4B-A11A2C3D4E5F"
 G_INPUT = "1D0F1C8A-0F7E-4D3E-9E4B-B11A2C3D4E5F"
@@ -342,7 +353,94 @@ def build():
     )
 
 
+def build_minimal():
+    """A deliberately boring build, to bisect a crash in the full one.
+
+    The Shortcuts app crashes on opening the full shortcut, and there are two
+    candidate causes: the signed container (this repo's CI signs on Linux with
+    shortcut-sign, which HANDBOOK.md flags as never verified against a device),
+    or something in the plist. This build isolates the second.
+
+    It keeps only what an upload actually requires, and drops every construct
+    the full version introduced to this repo: no If, no menu, no named
+    variables, no share-sheet workflow type. What is left is the linear
+    output-chaining the repo's three working shortcuts already use, plus the
+    two genuinely new things — the File-typed form entry that carries the image
+    and Get Dictionary Value.
+
+      Select Photos -> Convert to JPEG -> POST -> data -> link -> clipboard
+
+    So: if this opens and the full one crashes, the fault is in the control
+    flow or the workflow type. If this crashes too, the fault is in the upload
+    action or the container, and the plist's structure is not the problem.
+
+    It converts to JPEG unconditionally rather than testing the extension —
+    lossy for a PNG screenshot, but this is a diagnostic, not the deliverable.
+    """
+    actions = [
+        action(
+            "is.workflow.actions.selectphoto",
+            {"WFSelectMultiplePhotos": False},
+            uuid=M_SELECT,
+        ),
+        action(
+            "is.workflow.actions.image.convert",
+            {
+                "WFInput": action_output_input(M_SELECT, "Photos"),
+                "WFImageFormat": "JPEG",
+                "WFImageCompressionQuality": JPEG_QUALITY,
+                "WFImagePreserveMetadata": False,
+            },
+            uuid=M_CONVERT,
+        ),
+        action(
+            "is.workflow.actions.downloadurl",
+            {
+                "WFURL": text_token(ENDPOINT),
+                "WFHTTPMethod": "POST",
+                "WFHTTPBodyType": "Form",
+                "WFFormValues": dictionary_value(
+                    [
+                        file_item("image", (M_CONVERT, "Converted Image")),
+                        text_item("type", "file"),
+                    ]
+                ),
+                "ShowHeaders": False,
+            },
+            uuid=M_HTTP,
+        ),
+        action(
+            "is.workflow.actions.getvalueforkey",
+            {
+                "WFInput": action_output_input(M_HTTP, "Contents of URL"),
+                "WFDictionaryKey": "data",
+                "WFGetDictionaryValueType": "Value",
+            },
+            uuid=M_DATA,
+        ),
+        action(
+            "is.workflow.actions.getvalueforkey",
+            {
+                "WFInput": action_output_input(M_DATA, "Dictionary Value"),
+                "WFDictionaryKey": "link",
+                "WFGetDictionaryValueType": "Value",
+            },
+            uuid=M_LINK,
+        ),
+        action(
+            "is.workflow.actions.setclipboard",
+            {"WFInput": action_output_input(M_LINK, "Dictionary Value")},
+        ),
+        action(
+            "is.workflow.actions.showresult",
+            {"Text": text_with_variable(M_LINK, "Dictionary Value")},
+        ),
+    ]
+    return shortcut(actions, glyph_number=GLYPH, start_color=COLOR)
+
+
 if __name__ == "__main__":
     out_dir = sys.argv[1] if len(sys.argv) > 1 else HERE
     os.makedirs(out_dir, exist_ok=True)
     write_shortcut(os.path.join(out_dir, OUT_NAME), build())
+    write_shortcut(os.path.join(out_dir, MINIMAL_NAME), build_minimal())
