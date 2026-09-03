@@ -103,7 +103,8 @@ def action_output_input(uuid, output_name):
 # an earlier action's output, a named variable set by Set Variable, or the
 # input the shortcut was handed (the share sheet item, "Shortcut Input").
 
-SHORTCUT_INPUT = {"Type": "ExtensionInput"}
+# Both keys, as the Cherri compiler writes it.
+SHORTCUT_INPUT = {"Type": "ExtensionInput", "VariableName": "ShortcutInput"}
 
 
 def output_ref(uuid, output_name):
@@ -219,15 +220,34 @@ def dictionary_field(pairs):
 # WFControlFlowMode — 0 opens the block, 1 starts a branch (Otherwise, or a menu
 # item), 2 closes it. Every action between two markers belongs to the branch the
 # earlier marker opened.
+#
+# Every shape below was checked against two sources: a shortcut exported by the
+# Shortcuts app itself (the Cherri project's decompiler fixture, client version
+# 4033) and the output of the Cherri compiler for an equivalent program. The
+# first build of these helpers guessed, and the guess that was wrong — menu
+# items as a bare array of strings — crashed the Shortcuts app outright rather
+# than being rejected, so the details here are not cosmetic.
 CONTROL_FLOW_START = 0
 CONTROL_FLOW_BRANCH = 1
 CONTROL_FLOW_END = 2
 
-# WFCondition values. Shortcuts writes these as integers.
+# WFCondition values. Shortcuts writes these as integers; the full table is in
+# Cherri's shortcut.go.
 CONDITION_EQUALS = 4
 CONDITION_CONTAINS = 99
 CONDITION_HAS_ANY_VALUE = 100
 CONDITION_DOES_NOT_HAVE_ANY_VALUE = 101
+
+
+def _literal_or_token(*parts):
+    """A plain string when the text is all literal, a text token otherwise.
+
+    This is how both the app and Cherri write text fields: the token wrapper
+    appears only when there is an attachment to carry.
+    """
+    if len(parts) == 1 and isinstance(parts[0], str):
+        return parts[0]
+    return text_token(*parts)
 
 
 def if_start(group_id, value, condition, comparand=None, uuid=None):
@@ -245,7 +265,7 @@ def if_start(group_id, value, condition, comparand=None, uuid=None):
         "WFInput": {"Type": "Variable", "Variable": variable_input(value)},
     }
     if comparand is not None:
-        parameters["WFConditionalActionString"] = text_token(comparand)
+        parameters["WFConditionalActionString"] = _literal_or_token(comparand)
     return action("is.workflow.actions.conditional", parameters, uuid=uuid)
 
 
@@ -256,22 +276,35 @@ def if_else(group_id):
     )
 
 
-def if_end(group_id):
+def _block_end(identifier, group_id):
+    # The closing marker carries a UUID as well as the group: exported
+    # shortcuts and Cherri both write it, and Cherri reuses the group id.
     return action(
-        "is.workflow.actions.conditional",
+        identifier,
         {"GroupingIdentifier": group_id, "WFControlFlowMode": CONTROL_FLOW_END},
+        uuid=group_id,
     )
 
 
+def if_end(group_id):
+    return _block_end("is.workflow.actions.conditional", group_id)
+
+
 def menu_start(group_id, prompt, items):
-    """Open a Choose from Menu block. `items` are the option titles, in order."""
+    """Open a Choose from Menu block. `items` are the option titles, in order.
+
+    Each item is a dictionary-field-style entry, not a bare string — a bare
+    string array is what the app crashes on.
+    """
     return action(
         "is.workflow.actions.choosefrommenu",
         {
             "GroupingIdentifier": group_id,
             "WFControlFlowMode": CONTROL_FLOW_START,
             "WFMenuPrompt": prompt,
-            "WFMenuItems": list(items),
+            "WFMenuItems": [
+                {"WFItemType": ITEM_TYPE_TEXT, "WFValue": title} for title in items
+            ],
         },
     )
 
@@ -283,34 +316,47 @@ def menu_item(group_id, title):
         {
             "GroupingIdentifier": group_id,
             "WFControlFlowMode": CONTROL_FLOW_BRANCH,
+            "WFMenuItemAttributedTitle": title,
             "WFMenuItemTitle": title,
         },
     )
 
 
 def menu_end(group_id):
-    return action(
-        "is.workflow.actions.choosefrommenu",
-        {"GroupingIdentifier": group_id, "WFControlFlowMode": CONTROL_FLOW_END},
-    )
+    return _block_end("is.workflow.actions.choosefrommenu", group_id)
 
 
 def set_variable(name, value):
     return action(
         "is.workflow.actions.setvariable",
-        {"WFVariableName": name, "WFInput": variable_input(value)},
+        {
+            "WFVariableName": name,
+            "WFInput": variable_input(value),
+            # Present on every Set Variable the app writes, alongside the one
+            # inside WFInput.
+            "WFSerializationType": "WFTextTokenAttachment",
+        },
     )
 
 
-def shortcut(actions, glyph_number=59511, start_color=463140863, workflow_types=None):
+def shortcut(
+    actions,
+    glyph_number=59511,
+    start_color=463140863,
+    workflow_types=None,
+    uses_shortcut_input=False,
+):
     """Wrap actions in the top-level dictionary, matching a golden shortcut.
 
     Deliberately the exact key set of a known-importable shortcut: actions, the
     client release/version pair, an icon carrying an empty image-data blob, the
     import-questions and input-content-item-classes arrays, and workflow types.
     Nothing else — extra keys are what distinguished our earlier, rejected files.
+
+    The one addition is opt-in: `uses_shortcut_input` sets the flag the app and
+    Cherri both write whenever an action references Shortcut Input.
     """
-    return {
+    workflow = {
         "WFWorkflowActions": actions,
         "WFWorkflowClientRelease": CLIENT_RELEASE,
         "WFWorkflowClientVersion": CLIENT_VERSION,
@@ -324,6 +370,9 @@ def shortcut(actions, glyph_number=59511, start_color=463140863, workflow_types=
         "WFWorkflowInputContentItemClasses": ALL_INPUT_CONTENT_ITEM_CLASSES,
         "WFWorkflowTypes": workflow_types or [],
     }
+    if uses_shortcut_input:
+        workflow["WFWorkflowHasShortcutInputVariables"] = True
+    return workflow
 
 
 def write_shortcut(path, workflow):

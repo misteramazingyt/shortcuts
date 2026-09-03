@@ -146,7 +146,7 @@ def client_id():
         action("is.workflow.actions.comment", {"WFCommentActionText": SETUP_COMMENT}),
         action(
             "is.workflow.actions.gettext",
-            {"WFTextActionText": text_token(CLIENT_ID_PLACEHOLDER)},
+            {"WFTextActionText": CLIENT_ID_PLACEHOLDER},
             uuid=U_CLIENT_ID,
         ),
         set_variable(V_CLIENT_ID, (U_CLIENT_ID, "Text")),
@@ -217,7 +217,7 @@ def normalize_format():
 def post(uuid, headers):
     """The upload request. `headers` is the header dictionary, or None for none."""
     parameters = {
-        "WFURL": text_token(ENDPOINT),
+        "WFURL": ENDPOINT,
         "WFHTTPMethod": "POST",
         "WFHTTPBodyType": "Form",
         "WFFormValues": dictionary_value(
@@ -311,18 +311,16 @@ def choose_output():
         action(
             "is.workflow.actions.notification",
             {
-                "WFNotificationActionTitle": text_token("Imgur link copied"),
+                "WFNotificationActionTitle": "Imgur link copied",
                 "WFNotificationActionBody": text_token(variable_ref(V_LINK)),
                 "WFNotificationActionSound": False,
             },
         ),
         menu_item(G_MENU, MENU_QR),
+        # The QR action's text parameter is WFText, not WFInput.
         action(
             "is.workflow.actions.generatebarcode",
-            {
-                "WFInput": text_token(variable_ref(V_LINK)),
-                "WFQRCodeCorrectionLevel": "Medium",
-            },
+            {"WFText": text_token(variable_ref(V_LINK))},
             uuid=U_QR,
         ),
         action(
@@ -332,7 +330,7 @@ def choose_output():
         action(
             "is.workflow.actions.notification",
             {
-                "WFNotificationActionTitle": text_token("QR code saved to Photos"),
+                "WFNotificationActionTitle": "QR code saved to Photos",
                 "WFNotificationActionBody": text_token(variable_ref(V_LINK)),
                 "WFNotificationActionSound": False,
             },
@@ -359,7 +357,9 @@ def build():
     Shortcut Input already handles being run that way.
     """
     actions = client_id() + pick_image() + normalize_format() + upload() + choose_output()
-    return shortcut(actions, glyph_number=GLYPH, start_color=COLOR)
+    return shortcut(
+        actions, glyph_number=GLYPH, start_color=COLOR, uses_shortcut_input=True
+    )
 
 
 def build_minimal():

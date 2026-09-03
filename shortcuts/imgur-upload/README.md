@@ -59,38 +59,32 @@ ask for this itself — see [`build.py`](build.py); the flag that does was the
 prime suspect in a crash on import, and letting the app set it is both safer and
 exactly equivalent.
 
-## If the Shortcuts app crashes when you open it
+## The first build crashed the Shortcuts app — what that was
 
-A crash is different from a rejection, and it narrows things down. Two things
-can cause it, and one test tells them apart.
+The signed Control (Golden) opened and this one didn't, which put the fault in
+the plist. Checked against a shortcut exported by the Shortcuts app itself and
+against the output of the [Cherri](https://github.com/electrikmilk/cherri)
+compiler for an equivalent program, the first build had these wrong:
 
-First, get the app back: don't tap the shortcut again. Force-quit Shortcuts,
-then long-press its tile in the grid and **Delete** — deleting from the grid
-never opens it.
+- **Menu items were a bare array of strings.** The real format is an array of
+  `{WFItemType: 0, WFValue: "…"}` entries, and each item's branch marker also
+  carries `WFMenuItemAttributedTitle`. This is the one that crashes rather than
+  errors — the app force-casts the array.
+- **Generate QR Code** takes its text in `WFText`, not `WFInput`.
+- Set Variable carries a `WFSerializationType`, Shortcut Input references carry a
+  `VariableName`, block-closing markers carry a `UUID`, and a shortcut that
+  reads Shortcut Input sets `WFWorkflowHasShortcutInputVariables`.
 
-Then work through these in order. Each is one download.
+All of those are fixed in [`build.py`](build.py) and in the shared
+[`tools/shortcut_builder.py`](../../tools/shortcut_builder.py). The If blocks,
+the upload action, and the file-typed form field were already right.
 
-| # | Open this | If it crashes | If it opens |
-| --- | --- | --- | --- |
-| 1 | The **unsigned** [`Upload to Imgur.shortcut`](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/shortcuts/imgur-upload/Upload%20to%20Imgur.shortcut) (needs Private Sharing on) | The plist is at fault, not the signature → test 3 | The **signature** is at fault. The unsigned file is your working copy |
-| 2 | The signed [`Control (Golden)`](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Control%20%28Golden%29.shortcut) | Signing is broken for *every* shortcut here, including ones that predate this one | Signing is fine; the fault is specific to this shortcut |
-| 3 | [`Upload to Imgur (Minimal).shortcut`](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/shortcuts/imgur-upload/Upload%20to%20Imgur%20%28Minimal%29.shortcut) | The upload action itself, not the structure around it | The If blocks, the menu, or the share-sheet type |
+[`Upload to Imgur (Minimal).shortcut`](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/shortcuts/imgur-upload/Upload%20to%20Imgur%20%28Minimal%29.shortcut)
+is the same upload with no If, no menu and no variables — `Select Photos →
+Convert to JPEG → POST → link → clipboard`. It exists from the bisect and it's a
+perfectly usable uploader if you only ever want the link copied.
 
-Test 2 is what [`_control-golden`](../_control-golden/) exists for: a real Apple
-shortcut pushed through the same signing pipeline. If it crashes, nothing about
-this shortcut's contents is implicated — see
-[HANDBOOK.md](../../HANDBOOK.md), which flags CI signing as never verified
-against a device.
-
-**Upload to Imgur (Minimal)** is the same upload with everything else stripped
-out — no If, no menu, no named variables, no share-sheet type, just
-`Select Photos → Convert to JPEG → POST → link → clipboard`. It is a diagnostic
-rather than the deliverable (it converts every image to JPEG, and it always
-copies rather than asking), but if it is the one that survives, it is also a
-perfectly usable uploader. Delete both it and this section once the crash is
-pinned down.
-
-Whatever the outcome, **building it by hand always works** — see the action list
+And whatever happens, **building it by hand always works** — see the action list
 at the end of this file. Ten actions, no import, no signature.
 
 ## The API it talks to
