@@ -1,0 +1,340 @@
+#!/usr/bin/env python3
+"""Build the "Upload to Imgur" shortcut.
+
+Uploads an image to Imgur anonymously and then asks what to do with the link:
+copy it to the clipboard, or save a QR code of it to Photos.
+
+    Client ID -> pick image -> HEIC? convert -> POST /3/upload -> data.link
+                                                                     |
+                                              Copy Link  <-- menu -->  Save QR Code
+
+Anonymous means the upload is not attached to any Imgur account, but it is not
+credential-free: Imgur's API identifies the *app*, so the shortcut still needs a
+client ID from https://api.imgur.com/oauth2/addclient. It lives in the Text
+action at the top; a client ID is not a secret in the password sense (it is
+visible in every request any Imgur web client makes) but it is yours, so the
+placeholder ships empty rather than baking one in.
+
+Two details of the Imgur side drive the shape of this:
+
+  * The upload endpoint is POST https://api.imgur.com/3/upload with an
+    `Authorization: Client-ID <id>` header, sending the image as a multipart
+    form field named `image` (with `type=file`). The older /3/image path still
+    works and is the same handler; /3/upload is the current documented one.
+  * Imgur accepts JPEG, PNG and GIF — not HEIC, which is what an iPhone camera
+    produces by default. So the shortcut checks the file extension and converts
+    only in that case, leaving PNG screenshots and animated GIFs untouched.
+
+Run from anywhere:
+
+    python3 shortcuts/imgur-upload/build.py [OUTPUT_DIR]
+"""
+
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "tools"))
+
+from shortcut_builder import (
+    CONDITION_CONTAINS,
+    CONDITION_DOES_NOT_HAVE_ANY_VALUE,
+    CONDITION_HAS_ANY_VALUE,
+    SHORTCUT_INPUT,
+    action,
+    action_output_input,
+    dictionary_value,
+    file_item,
+    if_else,
+    if_end,
+    if_start,
+    menu_end,
+    menu_item,
+    menu_start,
+    set_variable,
+    shortcut,
+    text_item,
+    text_token,
+    variable_input,
+    variable_ref,
+    write_shortcut,
+)
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+OUT_NAME = "Upload to Imgur.shortcut"
+
+# Imgur API v3. POST here with the image as multipart form data.
+ENDPOINT = "https://api.imgur.com/3/upload"
+
+# What the Text action at the top of the shortcut says until you edit it. The
+# setup check looks for this exact string, so change both together.
+CLIENT_ID_PLACEHOLDER = "PASTE_YOUR_IMGUR_CLIENT_ID_HERE"
+
+# Quality for the HEIC -> JPEG conversion. High enough that the re-encode is not
+# visible; low enough to stay well inside Imgur's per-image limit.
+JPEG_QUALITY = 0.9
+
+MENU_COPY = "Copy Link"
+MENU_QR = "Save QR Code"
+
+# Named variables. Branches of an If cannot hand a value forward the way a
+# straight chain of actions does, so anything produced inside one is parked in a
+# variable and read back out after the block closes.
+V_CLIENT_ID = "ClientID"
+V_IMAGE = "Image"
+V_UPLOAD = "Upload"
+V_RESPONSE = "Response"
+V_LINK = "Link"
+
+# Fixed UUIDs and grouping identifiers keep rebuilds byte-identical.
+U_CLIENT_ID = "1D0F1C8A-0F7E-4D3E-9E4B-1A1A2C3D4E5F"
+U_SELECT = "1D0F1C8A-0F7E-4D3E-9E4B-2A1A2C3D4E5F"
+U_EXTENSION = "1D0F1C8A-0F7E-4D3E-9E4B-3A1A2C3D4E5F"
+U_CONVERT = "1D0F1C8A-0F7E-4D3E-9E4B-4A1A2C3D4E5F"
+U_HTTP = "1D0F1C8A-0F7E-4D3E-9E4B-5A1A2C3D4E5F"
+U_DATA = "1D0F1C8A-0F7E-4D3E-9E4B-6A1A2C3D4E5F"
+U_LINK = "1D0F1C8A-0F7E-4D3E-9E4B-7A1A2C3D4E5F"
+U_QR = "1D0F1C8A-0F7E-4D3E-9E4B-8A1A2C3D4E5F"
+
+G_SETUP = "1D0F1C8A-0F7E-4D3E-9E4B-A11A2C3D4E5F"
+G_INPUT = "1D0F1C8A-0F7E-4D3E-9E4B-B11A2C3D4E5F"
+G_HEIC = "1D0F1C8A-0F7E-4D3E-9E4B-C11A2C3D4E5F"
+G_FAILED = "1D0F1C8A-0F7E-4D3E-9E4B-D11A2C3D4E5F"
+G_MENU = "1D0F1C8A-0F7E-4D3E-9E4B-E11A2C3D4E5F"
+
+# Glyph and colour lifted from the golden shortcut: a known-good icon pair.
+GLYPH = 59831
+COLOR = 2071128575
+
+SETUP_COMMENT = (
+    "Setup: replace the text in the action below with your Imgur client ID.\n\n"
+    "Get one free at https://api.imgur.com/oauth2/addclient — register an "
+    "application of type \"Anonymous usage without user authorization\". Imgur "
+    "shows you a client ID; paste just the ID, nothing else.\n\n"
+    "Uploads made this way belong to no account, so they cannot be deleted from "
+    "the Imgur website afterwards."
+)
+
+
+def client_id():
+    """The client ID, held in an editable Text action and parked in a variable.
+
+    A Text action rather than an Ask Each Time prompt: this shortcut is meant to
+    run from the share sheet without questions, and the ID is the same forever.
+    """
+    return [
+        action("is.workflow.actions.comment", {"WFCommentActionText": SETUP_COMMENT}),
+        action(
+            "is.workflow.actions.gettext",
+            {"WFTextActionText": text_token(CLIENT_ID_PLACEHOLDER)},
+            uuid=U_CLIENT_ID,
+        ),
+        set_variable(V_CLIENT_ID, (U_CLIENT_ID, "Text")),
+        # Without this the first run fails with a bare 403 from Imgur, which
+        # says nothing about what is actually wrong.
+        if_start(G_SETUP, variable_ref(V_CLIENT_ID), CONDITION_CONTAINS, "PASTE_YOUR"),
+        action(
+            "is.workflow.actions.alert",
+            {
+                "WFAlertActionTitle": "Imgur client ID missing",
+                "WFAlertActionMessage": text_token(
+                    "Open this shortcut and paste your Imgur client ID into the "
+                    "Text action at the top. Get one at "
+                    "api.imgur.com/oauth2/addclient."
+                ),
+                "WFAlertActionCancelButtonShown": False,
+            },
+        ),
+        action("is.workflow.actions.exit"),
+        if_end(G_SETUP),
+    ]
+
+
+def pick_image():
+    """Use whatever was shared in, or ask for a photo when run on its own.
+
+    Run from the share sheet the image arrives as Shortcut Input; run from the
+    Shortcuts app or the home screen there is no input, so fall through to the
+    photo picker.
+    """
+    return [
+        if_start(G_INPUT, SHORTCUT_INPUT, CONDITION_HAS_ANY_VALUE),
+        set_variable(V_IMAGE, SHORTCUT_INPUT),
+        if_else(G_INPUT),
+        action(
+            "is.workflow.actions.selectphoto",
+            {"WFSelectMultiplePhotos": False},
+            uuid=U_SELECT,
+        ),
+        set_variable(V_IMAGE, (U_SELECT, "Photos")),
+        if_end(G_INPUT),
+    ]
+
+
+def normalize_format():
+    """Convert to JPEG only when the image is HEIC/HEIF, which Imgur rejects.
+
+    Converting unconditionally would flatten PNG transparency and kill GIF
+    animation, so the extension is tested first. "hei" catches both .heic and
+    .heif. Metadata is dropped in the conversion, which also strips the GPS
+    coordinates the camera wrote into the file before it goes somewhere public.
+    """
+    return [
+        action(
+            "is.workflow.actions.properties.images",
+            {
+                "WFInput": variable_input(variable_ref(V_IMAGE)),
+                "WFContentItemPropertyName": "File Extension",
+            },
+            uuid=U_EXTENSION,
+        ),
+        if_start(
+            G_HEIC,
+            (U_EXTENSION, "File Extension"),
+            CONDITION_CONTAINS,
+            "hei",
+        ),
+        action(
+            "is.workflow.actions.image.convert",
+            {
+                "WFInput": variable_input(variable_ref(V_IMAGE)),
+                "WFImageFormat": "JPEG",
+                "WFImageCompressionQuality": JPEG_QUALITY,
+                "WFImagePreserveMetadata": False,
+            },
+            uuid=U_CONVERT,
+        ),
+        set_variable(V_UPLOAD, (U_CONVERT, "Converted Image")),
+        if_else(G_HEIC),
+        set_variable(V_UPLOAD, variable_ref(V_IMAGE)),
+        if_end(G_HEIC),
+    ]
+
+
+def upload():
+    """POST the image and dig the link out of Imgur's JSON envelope.
+
+    The response is {"status": …, "success": …, "data": {"link": …}}, so the
+    link needs two hops. Both the raw response and the link are kept: the
+    response is what gets shown if the link never materializes.
+    """
+    return [
+        action(
+            "is.workflow.actions.downloadurl",
+            {
+                "WFURL": text_token(ENDPOINT),
+                "WFHTTPMethod": "POST",
+                "WFHTTPHeaders": dictionary_value(
+                    [
+                        text_item(
+                            "Authorization", "Client-ID ", variable_ref(V_CLIENT_ID)
+                        )
+                    ]
+                ),
+                "WFHTTPBodyType": "Form",
+                "WFFormValues": dictionary_value(
+                    [
+                        file_item("image", variable_ref(V_UPLOAD)),
+                        text_item("type", "file"),
+                    ]
+                ),
+                "ShowHeaders": False,
+            },
+            uuid=U_HTTP,
+        ),
+        set_variable(V_RESPONSE, (U_HTTP, "Contents of URL")),
+        action(
+            "is.workflow.actions.getvalueforkey",
+            {
+                "WFInput": variable_input(variable_ref(V_RESPONSE)),
+                "WFDictionaryKey": "data",
+                "WFGetDictionaryValueType": "Value",
+            },
+            uuid=U_DATA,
+        ),
+        action(
+            "is.workflow.actions.getvalueforkey",
+            {
+                "WFInput": action_output_input(U_DATA, "Dictionary Value"),
+                "WFDictionaryKey": "link",
+                "WFGetDictionaryValueType": "Value",
+            },
+            uuid=U_LINK,
+        ),
+        set_variable(V_LINK, (U_LINK, "Dictionary Value")),
+        # No link means Imgur refused: bad client ID, rate limit, file too
+        # large. Show what it said rather than a generic failure.
+        if_start(G_FAILED, variable_ref(V_LINK), CONDITION_DOES_NOT_HAVE_ANY_VALUE),
+        action(
+            "is.workflow.actions.alert",
+            {
+                "WFAlertActionTitle": "Imgur upload failed",
+                "WFAlertActionMessage": text_token(
+                    "Imgur returned:\n\n", variable_ref(V_RESPONSE)
+                ),
+                "WFAlertActionCancelButtonShown": False,
+            },
+        ),
+        action("is.workflow.actions.exit"),
+        if_end(G_FAILED),
+    ]
+
+
+def choose_output():
+    """The one question the shortcut asks: clipboard, or QR code in Photos."""
+    return [
+        menu_start(G_MENU, "Uploaded to Imgur", [MENU_COPY, MENU_QR]),
+        menu_item(G_MENU, MENU_COPY),
+        action(
+            "is.workflow.actions.setclipboard",
+            {"WFInput": variable_input(variable_ref(V_LINK))},
+        ),
+        action(
+            "is.workflow.actions.notification",
+            {
+                "WFNotificationActionTitle": text_token("Imgur link copied"),
+                "WFNotificationActionBody": text_token(variable_ref(V_LINK)),
+                "WFNotificationActionSound": False,
+            },
+        ),
+        menu_item(G_MENU, MENU_QR),
+        action(
+            "is.workflow.actions.generatebarcode",
+            {
+                "WFInput": text_token(variable_ref(V_LINK)),
+                "WFQRCodeCorrectionLevel": "Medium",
+            },
+            uuid=U_QR,
+        ),
+        action(
+            "is.workflow.actions.savetocameraroll",
+            {"WFInput": action_output_input(U_QR, "QR Code")},
+        ),
+        action(
+            "is.workflow.actions.notification",
+            {
+                "WFNotificationActionTitle": text_token("QR code saved to Photos"),
+                "WFNotificationActionBody": text_token(variable_ref(V_LINK)),
+                "WFNotificationActionSound": False,
+            },
+        ),
+        menu_end(G_MENU),
+    ]
+
+
+def build():
+    actions = client_id() + pick_image() + normalize_format() + upload() + choose_output()
+    # ActionExtension puts it in the share sheet, which is the point: share an
+    # image from Photos or Safari straight into the upload.
+    return shortcut(
+        actions,
+        glyph_number=GLYPH,
+        start_color=COLOR,
+        workflow_types=["ActionExtension"],
+    )
+
+
+if __name__ == "__main__":
+    out_dir = sys.argv[1] if len(sys.argv) > 1 else HERE
+    os.makedirs(out_dir, exist_ok=True)
+    write_shortcut(os.path.join(out_dir, OUT_NAME), build())
