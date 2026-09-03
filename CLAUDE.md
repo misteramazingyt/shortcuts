@@ -1,5 +1,15 @@
 # Working in this repository
 
+## Building or changing a shortcut? Use the `new-shortcut` skill first
+
+Any task that touches a `.shortcut` file, `shortcuts/`, or
+`tools/shortcut_builder.py` MUST start with the `new-shortcut` skill
+(`.claude/skills/new-shortcut/`). A `.shortcut` is a binary plist the Shortcuts
+app crashes on when the serialization is wrong — a guess from memory has broken
+this repo twice. The skill and its `reference/GROUND-TRUTH.md` hold the verified
+shapes and the rule: never invent a plist shape, start from a file a real tool
+produced. Do not write shortcut plists from memory.
+
 ## Commit straight to main
 
 Work on `main`. Commit to `main`. Push to `main`.
