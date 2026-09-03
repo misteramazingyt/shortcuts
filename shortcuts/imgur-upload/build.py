@@ -342,15 +342,24 @@ def choose_output():
 
 
 def build():
+    """The full shortcut.
+
+    No workflow types, deliberately. ["ActionExtension"] belongs here — it is
+    what puts a shortcut in the share sheet — but it made this the only file in
+    the repository carrying one, and the Shortcuts app crashed on opening it
+    while every other shortcut here (all of them typeless, plus a golden one
+    typed WatchKit) opens. ActionExtension is the flag that makes iOS register
+    the shortcut as a share-sheet extension during import, against the legacy
+    class names in WFWorkflowInputContentItemClasses, so it does real work at
+    exactly the moment of the crash.
+
+    Nothing is lost: switch **Show in Share Sheet** on in the shortcut's own
+    settings after importing and Shortcuts writes the type itself, correctly and
+    with whatever companion keys the installed iOS version wants. The If on
+    Shortcut Input already handles being run that way.
+    """
     actions = client_id() + pick_image() + normalize_format() + upload() + choose_output()
-    # ActionExtension puts it in the share sheet, which is the point: share an
-    # image from Photos or Safari straight into the upload.
-    return shortcut(
-        actions,
-        glyph_number=GLYPH,
-        start_color=COLOR,
-        workflow_types=["ActionExtension"],
-    )
+    return shortcut(actions, glyph_number=GLYPH, start_color=COLOR)
 
 
 def build_minimal():

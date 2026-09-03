@@ -53,9 +53,11 @@ while signed in.
    you have run at least one shortcut on the device). The
    [signed builds](../../signed) import without that toggle.
 
-To get it into the share sheet, open the shortcut's settings (ⓘ) and check
-**Show in Share Sheet** — the built file already asks for this, but confirm it
-survived the import.
+**To get it into the share sheet**, open the shortcut's settings (ⓘ) after
+importing and switch on **Show in Share Sheet**. The file deliberately does not
+ask for this itself — see [`build.py`](build.py); the flag that does was the
+prime suspect in a crash on import, and letting the app set it is both safer and
+exactly equivalent.
 
 ## If the Shortcuts app crashes when you open it
 
