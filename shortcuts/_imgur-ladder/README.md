@@ -4,24 +4,28 @@
 cannot test on a device. So we bisect. Two shortcuts, same top-level dictionary
 as every working shortcut here, differing only in how many actions they carry:
 
+These are the real Upload to Imgur action list cut in two. A followed by B is
+byte-for-byte the same 39 actions as the shortcut on the homepage; each half is
+balanced on its own and opens on its own.
+
 | Rung | What it contains | Download (signed) |
 | --- | --- | --- |
-| **Imgur A** | The control-flow half: a named variable, If / Otherwise on Shortcut Input, Choose from Menu, Show Notification, Show Result. No image work, no upload, no QR. | [Imgur A](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Imgur%20A.shortcut) |
-| **Imgur B** | The full Upload to Imgur action list, on the same header. The whole thing. | [Imgur B](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Imgur%20B.shortcut) |
+| **Imgur A** (first half, 16 actions) | The setup: client-ID text + Set Variable, pick the image (If on Shortcut Input), convert to JPEG if HEIC (If on the extension). Ends having chosen what to upload. | [Imgur A](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Imgur%20A.shortcut) |
+| **Imgur B** (second half, 23 actions) | The upload (Form request with the image as a File field, two dictionary lookups, failure alert) and the menu (Copy Link / Save QR Code, with its notification and QR-code actions). | [Imgur B](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Imgur%20B.shortcut) |
 
 ## Do this
 
 Open both. Just open them — the crash is on open, and neither uploads anything.
 Then tell me which of these happened:
 
-- **A opens, B crashes** → the fault is in the actions B adds (image / upload /
-  QR). I split B into two and send the next pair.
-- **A crashes** → a core construct (variable, If, or menu) is wrong. I split A
-  down toward the single culprit.
-- **Both open** → every action is fine; the crash is something the full file has
-  that these don't (its header or size). I bring in a modern-header rung next.
-- **Both crash** → even the small control-flow shortcut dies, which points at
-  something fundamental in how these are built or signed. That too is an answer.
+- **A opens, B crashes** → the culprit is in the second half (upload / menu /
+  QR). I cut B in two and send the next pair.
+- **A crashes, B opens** → the culprit is in the first half (pick image /
+  convert). I cut A in two.
+- **Both crash** → each half has a problem, or the problem is a construct both
+  share (both use If blocks). I cut whichever is simpler first.
+- **Both open** → neither half alone crashes, so the crash needs the whole
+  thing present — size, or the header. I bring in a modern-header rung next.
 
 Whichever rung misbehaves, I subdivide *that* rung and we repeat. Each round
 halves what's left, so this converges fast.

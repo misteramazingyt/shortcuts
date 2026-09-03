@@ -1,31 +1,29 @@
 #!/usr/bin/env python3
-"""Two signed rungs to bisect the "Upload to Imgur" crash on a device.
+"""Cut the real "Upload to Imgur" shortcut in half to bisect its crash.
 
-The shortcut crashes the Shortcuts app on open. I cannot test on a device, so
-we bisect. Both rungs use the SAME top-level dictionary the working shortcuts
-here use (legacy, client 736), so the only thing that differs between them is
-how many actions they contain. That keeps the search on one axis: open both,
-and whichever crashes gets split in half next.
+The shortcut crashes the Shortcuts app on open and I cannot test on a device.
+So this takes the ACTUAL action list of Upload to Imgur and splits it in two
+contiguous halves at a clean block boundary. Each half is a real, openable
+shortcut on the same header the working shortcuts here use.
 
-  A — the control-flow half of the real shortcut: named variable, If/Otherwise
-      on Shortcut Input, Choose from Menu, Show Notification, Show Result. No
-      image work, no upload, no QR.
+  A — the FIRST half: everything up to and including deciding what to upload.
+      client-ID text + Set Variable, pick the image (If on Shortcut Input),
+      convert to JPEG if it is HEIC (If on the extension). Ends with the
+      Upload variable chosen.
 
-  B — the full "Upload to Imgur" action list (same actions as the shortcut on
-      the homepage), on the same header. This is the whole thing; we expect it
-      to crash, which confirms the download reproduces what you see.
+  B — the SECOND half: the upload itself (the Form request with the image as a
+      File field, the two dictionary lookups, the failure alert) and the menu
+      (Copy Link / Save QR Code with its notification and QR actions).
 
-The protocol:
+Open both. Whichever crashes contains the culprit, and I split THAT half again
+next round. If A opens and B crashes, the bug is in the upload/menu actions; if
+A crashes, it is in the pick/convert actions. Same header on both, so the only
+thing that varies is which actions are present.
 
-  A opens, B crashes -> the fault is in the actions that B adds (image / upload
-                        / QR). Split B: next pair adds those in halves.
-  A crashes          -> a core construct (variable / If / menu) is wrong. Split
-                        A: next pair pares it down toward the single culprit.
-  A opens, B opens   -> the actions are all fine; the crash is something the
-                        full file has that these don't (its header/size). We
-                        bring in the modern-header rung next.
-
-Only OPEN them; the crash is on open. Neither uploads anything.
+The split is at a top-level boundary, so each half's If/menu blocks are whole
+and balanced. B references a couple of variables the first half set (ClientID,
+Upload); undefined, they make B run wrong if executed, but this test is about
+OPENING, not running. Do not run them.
 
 Run from anywhere:
 
@@ -39,23 +37,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "tools"))
 sys.path.insert(0, os.path.join(HERE, "..", "imgur-upload"))
 
-from shortcut_builder import (  # noqa: E402
-    CONDITION_HAS_ANY_VALUE,
-    SHORTCUT_INPUT,
-    action,
-    if_else,
-    if_end,
-    if_start,
-    menu_end,
-    menu_item,
-    menu_start,
-    modern_shortcut,  # noqa: F401  (reserved for the A-opens-B-opens branch)
-    set_variable,
-    shortcut,
-    text_token,
-    variable_ref,
-    write_shortcut,
-)
+from shortcut_builder import shortcut, write_shortcut  # noqa: E402
 
 import build as imgur  # noqa: E402  (the real shortcut's action builders)
 
@@ -66,86 +48,28 @@ NAME_B = "Imgur B.shortcut"
 GLYPH = 59511
 COLOR = 4251333119
 
-# Fixed UUIDs and group ids keep rebuilds byte-identical.
-U_TEXT = "3D0F1C8A-0F7E-4D3E-9E4B-0111A2C3D4E5"
-U_NOTE = "3D0F1C8A-0F7E-4D3E-9E4B-0211A2C3D4E5"
-G_INPUT = "3D0F1C8A-0F7E-4D3E-9E4B-A211A2C3D4E5"
-G_MENU = "3D0F1C8A-0F7E-4D3E-9E4B-A311A2C3D4E5"
+
+def first_half():
+    """Actions 0..N/2 of the real shortcut, ending at a clean block boundary."""
+    return imgur.client_id() + imgur.pick_image() + imgur.normalize_format()
+
+
+def second_half():
+    """Actions N/2..end of the real shortcut, starting at a clean block boundary."""
+    return imgur.upload() + imgur.choose_output()
 
 
 def build_a():
-    """Control-flow half: named variable, If/Otherwise, menu, notification."""
-    actions = [
-        action(
-            "is.workflow.actions.comment",
-            {"WFCommentActionText": "Imgur bisect A: control flow only, legacy header."},
-        ),
-        action(
-            "is.workflow.actions.gettext",
-            {"WFTextActionText": "start"},
-            uuid=U_TEXT,
-        ),
-        set_variable("Seed", (U_TEXT, "Text")),
-        # If/Otherwise on Shortcut Input, a variable set in each branch.
-        if_start(G_INPUT, SHORTCUT_INPUT, CONDITION_HAS_ANY_VALUE),
-        set_variable("Note", SHORTCUT_INPUT),
-        if_else(G_INPUT),
-        action(
-            "is.workflow.actions.gettext",
-            {"WFTextActionText": "run directly, no input"},
-            uuid=U_NOTE,
-        ),
-        set_variable("Note", (U_NOTE, "Text")),
-        if_end(G_INPUT),
-        # Choose from Menu with two items, each a notification.
-        menu_start(G_MENU, "Imgur bisect A", ["Option A", "Option B"]),
-        menu_item(G_MENU, "Option A"),
-        action(
-            "is.workflow.actions.notification",
-            {
-                "WFNotificationActionTitle": "You chose A",
-                "WFNotificationActionBody": text_token(variable_ref("Note")),
-                "WFNotificationActionSound": False,
-            },
-        ),
-        menu_item(G_MENU, "Option B"),
-        action(
-            "is.workflow.actions.notification",
-            {
-                "WFNotificationActionTitle": "You chose B",
-                "WFNotificationActionBody": text_token(variable_ref("Note")),
-                "WFNotificationActionSound": False,
-            },
-        ),
-        menu_end(G_MENU),
-        action(
-            "is.workflow.actions.showresult",
-            {"Text": text_token(variable_ref("Note"))},
-        ),
-    ]
-    # Legacy top-level, exactly like the working shortcuts here.
+    # Legacy header, like every working shortcut here. The first half references
+    # Shortcut Input, so set the flag.
     return shortcut(
-        actions, glyph_number=GLYPH, start_color=COLOR, uses_shortcut_input=True
+        first_half(), glyph_number=GLYPH, start_color=COLOR, uses_shortcut_input=True
     )
 
 
 def build_b():
-    """The full Upload to Imgur action list, on the same legacy header as A.
-
-    Same header as A and as every working shortcut here, so the only difference
-    from A is the added actions. (modern_shortcut, imported below, is held in
-    reserve for the A-opens-B-opens branch, where the header becomes suspect.)
-    """
-    actions = (
-        imgur.client_id()
-        + imgur.pick_image()
-        + imgur.normalize_format()
-        + imgur.upload()
-        + imgur.choose_output()
-    )
-    return shortcut(
-        actions, glyph_number=GLYPH, start_color=COLOR, uses_shortcut_input=True
-    )
+    # Same header; the second half does not touch Shortcut Input.
+    return shortcut(second_half(), glyph_number=GLYPH, start_color=COLOR)
 
 
 if __name__ == "__main__":
