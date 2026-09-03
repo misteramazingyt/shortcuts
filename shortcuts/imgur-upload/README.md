@@ -12,26 +12,32 @@ sheet — or run it on its own and it opens the photo picker.
 image in  →  HEIC? convert to JPEG  →  POST /3/upload  →  data.link  →  menu
 ```
 
-## Setup — get a client ID first
+## Setup
 
-Imgur's "anonymous" upload means *not attached to an account*. It still needs a
-client ID, because the API identifies the app making the request.
+None. Install it and run it.
 
-1. Go to [api.imgur.com/oauth2/addclient](https://api.imgur.com/oauth2/addclient)
-   (you need an Imgur account to register, but nothing you upload is tied to it).
-2. Pick **Anonymous usage without user authorization** as the type. Any name and
-   any URL will do — the callback URL is unused for this flow.
-3. Imgur shows you a **Client ID**. Copy it.
-4. Open the shortcut and paste it into the **Text** action at the very top,
-   replacing `PASTE_YOUR_IMGUR_CLIENT_ID_HERE`. Paste the ID alone — the
-   `Client-ID` prefix is added by the header, not by you.
+Every Imgur guide tells you to register an app first and paste in a client ID.
+That is no longer possible and no longer necessary:
 
-Until you do, the shortcut stops on the first run and tells you so, rather than
-failing with a bare `403` from Imgur.
+- **You can't get one.** `api.imgur.com/oauth2/addclient`, the registration page
+  the API docs point at, now `301`s to the Imgur homepage.
+- **You don't need one.** As of September 2026 `POST /3/upload` accepts an
+  anonymous upload with no `Authorization` header at all. Verified against the
+  live endpoint.
 
-A client ID is not a password — it goes out in the clear with every request any
-Imgur web client makes — but it is yours and it carries your rate limit, so
-don't publish the edited shortcut.
+So the Text action at the top of the shortcut ships holding its placeholder, and
+the shortcut treats that as "no client ID" and sends no header. **Leave it
+alone** and everything works.
+
+If you *do* have a client ID from before registration closed, replace the whole
+placeholder with it — just the ID, the `Client-ID` prefix is added for you — and
+every upload goes out under it instead. The shortcut picks the path by looking
+at whether the placeholder is still there, so replace it, don't empty it.
+
+Should Imgur start enforcing client IDs again, the shortcut will show you their
+error verbatim rather than failing silently. There is currently no way to
+register a new app; if that changes it will be under your Imgur account settings
+while signed in.
 
 ## Install
 
@@ -57,7 +63,7 @@ Imgur API v3, the current documented upload path:
 
 ```
 POST https://api.imgur.com/3/upload
-Authorization: Client-ID <your client ID>
+Authorization: Client-ID <your client ID>    ← sent only if you pasted one in
 Content-Type: multipart/form-data
 
 image=<the image file>
@@ -96,38 +102,42 @@ next to the one for `link` and append it to what gets copied.
   too, add a **Convert Image** action with metadata off in the Otherwise branch.
 - **Anonymous is not private.** Anyone with the link can view it, Imgur can
   remove it, and you can't delete it from the website without the `deletehash`.
-- **Size.** Keep uploads under 10 MB; anonymous quotas are per client ID and per
-  hour, and a large batch will hit them.
+- **Size.** Keep uploads under 10 MB.
+- **Rate limits.** Imgur meters anonymous uploads per hour — against your client
+  ID if you sent one, otherwise against your IP address. Normal use won't come
+  near it; uploading a whole album in a loop will.
 
 ## Building it by hand
 
 Every action in order, if you would rather assemble it in the Shortcuts app than
-import a file. Steps 4 and 11 are guards — skip them and everything still works,
-you just get worse errors.
+import a file. Building it without a client ID is simpler: skip steps 1–2 and
+build only the no-header half of step 6.
 
-1. **Text** — your client ID.
+1. **Text** — `PASTE_YOUR_IMGUR_CLIENT_ID_HERE`, or your client ID if you have
+   one.
 2. **Set Variable** `ClientID` to the Text output.
-3. **If** `ClientID` *contains* `PASTE_YOUR` → **Show Alert** ("paste your client
-   ID") → **Stop This Shortcut**. **End If**.
-4. **If** `Shortcut Input` *has any value* → **Set Variable** `Image` to Shortcut
+3. **If** `Shortcut Input` *has any value* → **Set Variable** `Image` to Shortcut
    Input. **Otherwise** → **Select Photos** (Select Multiple off) → **Set
    Variable** `Image`. **End If**.
-5. **Get Details of Images** — *File Extension* of `Image`.
-6. **If** that *contains* `hei` → **Convert Image** `Image` to **JPEG**, Preserve
+4. **Get Details of Images** — *File Extension* of `Image`.
+5. **If** that *contains* `hei` → **Convert Image** `Image` to **JPEG**, Preserve
    Metadata off → **Set Variable** `Upload`. **Otherwise** → **Set Variable**
    `Upload` to `Image`. **End If**.
-7. **Get Contents of URL** — `https://api.imgur.com/3/upload`, Method **POST**.
-   - Headers: `Authorization` = `Client-ID ` followed by the `ClientID` variable
-     (one space between them, inside the same field).
-   - Request Body: **Form**. Field `image`, type **File**, value the `Upload`
-     variable. Field `type`, type Text, value `file`.
-8. **Set Variable** `Response` to Contents of URL.
-9. **Get Dictionary Value** — *Value* for `data` in `Response`.
-10. **Get Dictionary Value** — *Value* for `link` in that. **Set Variable**
-    `Link`.
-11. **If** `Link` *does not have any value* → **Show Alert** with `Response` →
-    **Stop This Shortcut**. **End If**.
-12. **Choose from Menu** "Uploaded to Imgur":
+6. **If** `ClientID` *contains* `PASTE_YOUR` → upload **without** a header.
+   **Otherwise** → the same upload **with** one. **End If**. Both are a **Get
+   Contents of URL** — `https://api.imgur.com/3/upload`, Method **POST** —
+   followed by **Set Variable** `Response`.
+   - Request Body (both): **Form**. Field `image`, type **File**, value the
+     `Upload` variable. Field `type`, type Text, value `file`.
+   - Headers (Otherwise branch only): `Authorization` = `Client-ID ` followed by
+     the `ClientID` variable, one space between them, inside the same field.
+7. **Get Dictionary Value** — *Value* for `data` in `Response`.
+8. **Get Dictionary Value** — *Value* for `link` in that. **Set Variable**
+   `Link`.
+9. **If** `Link` *does not have any value* → **Show Alert** with `Response` →
+   **Stop This Shortcut**. **End If**. (A guard — skip it and a failed upload
+   just gives you a worse error.)
+10. **Choose from Menu** "Uploaded to Imgur":
     - **Copy Link** → **Copy to Clipboard** `Link` → **Show Notification**.
     - **Save QR Code** → **Generate QR Code** from `Link` → **Save to Photo
       Album** → **Show Notification**.

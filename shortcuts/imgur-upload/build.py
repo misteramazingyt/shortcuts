@@ -8,19 +8,19 @@ copy it to the clipboard, or save a QR code of it to Photos.
                                                                      |
                                               Copy Link  <-- menu -->  Save QR Code
 
-Anonymous means the upload is not attached to any Imgur account, but it is not
-credential-free: Imgur's API identifies the *app*, so the shortcut still needs a
-client ID from https://api.imgur.com/oauth2/addclient. It lives in the Text
-action at the top; a client ID is not a secret in the password sense (it is
-visible in every request any Imgur web client makes) but it is yours, so the
-placeholder ships empty rather than baking one in.
+Three details of the Imgur side drive the shape of this:
 
-Two details of the Imgur side drive the shape of this:
-
-  * The upload endpoint is POST https://api.imgur.com/3/upload with an
-    `Authorization: Client-ID <id>` header, sending the image as a multipart
-    form field named `image` (with `type=file`). The older /3/image path still
-    works and is the same handler; /3/upload is the current documented one.
+  * The upload endpoint is POST https://api.imgur.com/3/upload, sending the
+    image as a multipart form field named `image` (with `type=file`). The older
+    /3/image path is the same handler; /3/upload is the current documented one.
+  * A client ID is optional in practice. Imgur documents an
+    `Authorization: Client-ID <id>` header, but as of 2026-09 the endpoint
+    accepts anonymous uploads with no header at all — which is just as well,
+    since https://api.imgur.com/oauth2/addclient, the registration page every
+    Imgur guide points at, now redirects to the homepage. So the shortcut sends
+    the header only when a client ID has actually been pasted in, and works out
+    of the box without one. Two upload actions rather than one, because a header
+    dictionary is fixed per action and cannot be built conditionally.
   * Imgur accepts JPEG, PNG and GIF — not HEIC, which is what an iPhone camera
     produces by default. So the shortcut checks the file extension and converts
     only in that case, leaving PNG screenshots and animated GIFs untouched.
@@ -66,9 +66,12 @@ OUT_NAME = "Upload to Imgur.shortcut"
 # Imgur API v3. POST here with the image as multipart form data.
 ENDPOINT = "https://api.imgur.com/3/upload"
 
-# What the Text action at the top of the shortcut says until you edit it. The
-# setup check looks for this exact string, so change both together.
+# What the Text action at the top of the shortcut says until you edit it.
+# Leaving it alone is a supported choice: the untouched placeholder is what
+# selects the no-client-ID upload. The test below looks for a fragment of this
+# string, so change the two together.
 CLIENT_ID_PLACEHOLDER = "PASTE_YOUR_IMGUR_CLIENT_ID_HERE"
+CLIENT_ID_UNSET_MARKER = "PASTE_YOUR"
 
 # Quality for the HEIC -> JPEG conversion. High enough that the re-encode is not
 # visible; low enough to stay well inside Imgur's per-image limit.
@@ -91,12 +94,13 @@ U_CLIENT_ID = "1D0F1C8A-0F7E-4D3E-9E4B-1A1A2C3D4E5F"
 U_SELECT = "1D0F1C8A-0F7E-4D3E-9E4B-2A1A2C3D4E5F"
 U_EXTENSION = "1D0F1C8A-0F7E-4D3E-9E4B-3A1A2C3D4E5F"
 U_CONVERT = "1D0F1C8A-0F7E-4D3E-9E4B-4A1A2C3D4E5F"
-U_HTTP = "1D0F1C8A-0F7E-4D3E-9E4B-5A1A2C3D4E5F"
+U_HTTP_ANON = "1D0F1C8A-0F7E-4D3E-9E4B-5A1A2C3D4E5F"
+U_HTTP_KEYED = "1D0F1C8A-0F7E-4D3E-9E4B-9A1A2C3D4E5F"
 U_DATA = "1D0F1C8A-0F7E-4D3E-9E4B-6A1A2C3D4E5F"
 U_LINK = "1D0F1C8A-0F7E-4D3E-9E4B-7A1A2C3D4E5F"
 U_QR = "1D0F1C8A-0F7E-4D3E-9E4B-8A1A2C3D4E5F"
 
-G_SETUP = "1D0F1C8A-0F7E-4D3E-9E4B-A11A2C3D4E5F"
+G_AUTH = "1D0F1C8A-0F7E-4D3E-9E4B-A11A2C3D4E5F"
 G_INPUT = "1D0F1C8A-0F7E-4D3E-9E4B-B11A2C3D4E5F"
 G_HEIC = "1D0F1C8A-0F7E-4D3E-9E4B-C11A2C3D4E5F"
 G_FAILED = "1D0F1C8A-0F7E-4D3E-9E4B-D11A2C3D4E5F"
@@ -107,20 +111,25 @@ GLYPH = 59831
 COLOR = 2071128575
 
 SETUP_COMMENT = (
-    "Setup: replace the text in the action below with your Imgur client ID.\n\n"
-    "Get one free at https://api.imgur.com/oauth2/addclient — register an "
-    "application of type \"Anonymous usage without user authorization\". Imgur "
-    "shows you a client ID; paste just the ID, nothing else.\n\n"
-    "Uploads made this way belong to no account, so they cannot be deleted from "
-    "the Imgur website afterwards."
+    "No setup needed — run it as is.\n\n"
+    "Imgur's upload endpoint currently accepts anonymous uploads with no "
+    "credentials, so the action below is left as the placeholder on purpose. "
+    "Leave it alone and the shortcut uploads without a client ID.\n\n"
+    "If you do have an Imgur client ID, replace the whole placeholder with it "
+    "(just the ID — the \"Client-ID\" prefix is added for you) and every upload "
+    "will be sent under it instead. Imgur's registration page at "
+    "api.imgur.com/oauth2/addclient now redirects to the homepage, so there is "
+    "currently no way to obtain a new one.\n\n"
+    "Either way the upload belongs to no account and cannot be deleted from the "
+    "Imgur website afterwards."
 )
 
 
 def client_id():
-    """The client ID, held in an editable Text action and parked in a variable.
+    """The optional client ID, in an editable Text action, parked in a variable.
 
     A Text action rather than an Ask Each Time prompt: this shortcut is meant to
-    run from the share sheet without questions, and the ID is the same forever.
+    run from the share sheet without questions, and the ID never changes.
     """
     return [
         action("is.workflow.actions.comment", {"WFCommentActionText": SETUP_COMMENT}),
@@ -130,23 +139,6 @@ def client_id():
             uuid=U_CLIENT_ID,
         ),
         set_variable(V_CLIENT_ID, (U_CLIENT_ID, "Text")),
-        # Without this the first run fails with a bare 403 from Imgur, which
-        # says nothing about what is actually wrong.
-        if_start(G_SETUP, variable_ref(V_CLIENT_ID), CONDITION_CONTAINS, "PASTE_YOUR"),
-        action(
-            "is.workflow.actions.alert",
-            {
-                "WFAlertActionTitle": "Imgur client ID missing",
-                "WFAlertActionMessage": text_token(
-                    "Open this shortcut and paste your Imgur client ID into the "
-                    "Text action at the top. Get one at "
-                    "api.imgur.com/oauth2/addclient."
-                ),
-                "WFAlertActionCancelButtonShown": False,
-            },
-        ),
-        action("is.workflow.actions.exit"),
-        if_end(G_SETUP),
     ]
 
 
@@ -211,38 +203,54 @@ def normalize_format():
     ]
 
 
+def post(uuid, headers):
+    """The upload request. `headers` is the header dictionary, or None for none."""
+    parameters = {
+        "WFURL": text_token(ENDPOINT),
+        "WFHTTPMethod": "POST",
+        "WFHTTPBodyType": "Form",
+        "WFFormValues": dictionary_value(
+            [
+                file_item("image", variable_ref(V_UPLOAD)),
+                text_item("type", "file"),
+            ]
+        ),
+        "ShowHeaders": False,
+    }
+    if headers is not None:
+        parameters["WFHTTPHeaders"] = headers
+    return action("is.workflow.actions.downloadurl", parameters, uuid=uuid)
+
+
 def upload():
     """POST the image and dig the link out of Imgur's JSON envelope.
+
+    Two requests, differing only in whether they carry an Authorization header,
+    because the placeholder being untouched means there is no client ID to send
+    and a header dictionary cannot be assembled conditionally within one action.
 
     The response is {"status": …, "success": …, "data": {"link": …}}, so the
     link needs two hops. Both the raw response and the link are kept: the
     response is what gets shown if the link never materializes.
     """
     return [
-        action(
-            "is.workflow.actions.downloadurl",
-            {
-                "WFURL": text_token(ENDPOINT),
-                "WFHTTPMethod": "POST",
-                "WFHTTPHeaders": dictionary_value(
-                    [
-                        text_item(
-                            "Authorization", "Client-ID ", variable_ref(V_CLIENT_ID)
-                        )
-                    ]
-                ),
-                "WFHTTPBodyType": "Form",
-                "WFFormValues": dictionary_value(
-                    [
-                        file_item("image", variable_ref(V_UPLOAD)),
-                        text_item("type", "file"),
-                    ]
-                ),
-                "ShowHeaders": False,
-            },
-            uuid=U_HTTP,
+        if_start(
+            G_AUTH,
+            variable_ref(V_CLIENT_ID),
+            CONDITION_CONTAINS,
+            CLIENT_ID_UNSET_MARKER,
         ),
-        set_variable(V_RESPONSE, (U_HTTP, "Contents of URL")),
+        post(U_HTTP_ANON, None),
+        set_variable(V_RESPONSE, (U_HTTP_ANON, "Contents of URL")),
+        if_else(G_AUTH),
+        post(
+            U_HTTP_KEYED,
+            dictionary_value(
+                [text_item("Authorization", "Client-ID ", variable_ref(V_CLIENT_ID))]
+            ),
+        ),
+        set_variable(V_RESPONSE, (U_HTTP_KEYED, "Contents of URL")),
+        if_end(G_AUTH),
         action(
             "is.workflow.actions.getvalueforkey",
             {
