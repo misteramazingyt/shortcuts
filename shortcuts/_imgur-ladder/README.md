@@ -1,24 +1,33 @@
-# Imgur crash bisect — round 3 (splitting the upload block)
+# Imgur crash bisect — round 4 (four revisions of the request)
 
-Trail: round 1 → second half crashes; round 2 → the upload block (B1) crashes,
-the menu (B2) opens. This round cuts the upload block at its one seam. Same
-header; B1a then B1b is byte-for-byte the upload block.
+Trail: second half → upload block → request half (B1a) crashes; the parse half
+(B1b) opens. B1a is an If around two Get-Contents-of-URL requests with a Form
+body. Instead of halving again, here are **four revisions of a single request**,
+each adding one thing to the last. Open them in order; the first that crashes
+names the exact addition responsible.
 
-| Rung | What it contains | Download (signed) |
+| # | Adds | Download (signed) |
 | --- | --- | --- |
-| **Imgur B1a** (the request, 7 actions) | The If choosing anonymous vs client-ID, and inside it the two Get-Contents-of-URL actions whose body is a **Form with the image as a File field**. This is the one construct nothing else in this repo uses — the prime suspect. | [Imgur B1a](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Imgur%20B1a.shortcut) |
-| **Imgur B1b** (the parse, 7 actions) | Get Dictionary Value for `data` then `link`, Set Variable, and the "no link → alert, stop" If. | [Imgur B1b](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Imgur%20B1b.shortcut) |
+| **B1a-1** | a bare POST to the URL, no body at all | [B1a-1](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Imgur%20B1a-1.shortcut) |
+| **B1a-2** | + a Form body of text items (image sent as text) | [B1a-2](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Imgur%20B1a-2.shortcut) |
+| **B1a-3** | + the image as a **File field** (`WFItemType 5`) — what the real shortcut does | [B1a-3](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Imgur%20B1a-3.shortcut) |
+| **B1a-4** | + the Authorization headers dictionary | [B1a-4](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Imgur%20B1a-4.shortcut) |
 
-## Do this
+## What each outcome means
 
-Open both. Tell me which crashes:
+- **B1a-1 crashes** → Get-Contents-of-URL itself is serialized wrong here.
+- **1 opens, B1a-2 crashes** → the Form body is the problem, not the File field.
+- **2 opens, B1a-3 crashes** → the **File field** (`WFItemType 5`) is the bug —
+  the value I took from a web claim instead of ground truth. I replace how the
+  image is attached and the real shortcut is fixed.
+- **3 opens, B1a-4 crashes** → the headers dictionary is the bug.
+- **all four open** → the crash needs the If wrapper or both requests together;
+  I go back and split B1a that way.
 
-- **B1a crashes** → it is the Form / File request body. That is almost certainly
-  the bug. Next I test a plain request, then the File field on its own, to fix
-  how that field is serialized.
-- **B1b crashes** → it is Get Dictionary Value or the alert/stop. I split B1b.
+The real shortcut's two requests are B1a-3 (anonymous) and B1a-4 (client-ID), so
+whichever of those first crashes is the actual defect.
 
-Only open them; neither uploads.
+Only open them; none upload.
 
 ## Rebuilding
 
