@@ -62,7 +62,7 @@ from shortcut_builder import (
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-OUT_NAME = "Upload to Imgur.shortcut"
+OUT_NAME = "Upload to Imgur v2.shortcut"
 
 # A cut-down build used to bisect the crash described on build_minimal().
 MINIMAL_NAME = "Upload to Imgur (Minimal).shortcut"

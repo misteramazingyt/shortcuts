@@ -44,7 +44,9 @@ while signed in.
 1. Tap the download link **in Safari, not the GitHub mobile app** — the app
    can't download binary files and shows a blank preview instead.
 
-   [`Upload to Imgur.shortcut`](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/shortcuts/imgur-upload/Upload%20to%20Imgur.shortcut)
+   [`Upload to Imgur v2.shortcut`](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/shortcuts/imgur-upload/Upload%20to%20Imgur%20v2.shortcut)
+   — or the signed build from the table on the repo homepage, which needs no
+   settings change.
 
 2. Open it from Safari's downloads, or from Files, and Shortcuts offers to add
    it.
@@ -58,6 +60,26 @@ importing and switch on **Show in Share Sheet**. The file deliberately does not
 ask for this itself — see [`build.py`](build.py); the flag that does was the
 prime suspect in a crash on import, and letting the app set it is both safer and
 exactly equivalent.
+
+## Which build do you have?
+
+The first build crashed the Shortcuts app on open. The fixed build is a
+different file with a different name, so there is no way to mistake one for the
+other:
+
+| | First build | Fixed build |
+| --- | --- | --- |
+| File and link | `Upload to Imgur.shortcut` (deleted from this repo) | `Upload to Imgur v2.shortcut` |
+| Name it imports under | *Upload to Imgur* | *Upload to Imgur v2* |
+| Unsigned plist | 6518–7161 bytes | 7161 bytes, SHA-256 `fffe8614…835237` |
+| Menu items in the plist | `<array><string>Copy Link</string>…` | `<array><dict>WFItemType 0 / WFValue "Copy Link"</dict>…` |
+
+The signed downloads are all ~29 KB regardless — the signature adds about
+22 KB to every shortcut here, so the size of a signed file says nothing about
+which build it is. The name after import does.
+
+If *Upload to Imgur v2* also crashes, that is new information, because every
+structure in it now matches a file the Shortcuts app wrote itself. Say so.
 
 ## The first build crashed the Shortcuts app — what that was
 

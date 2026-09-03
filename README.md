@@ -4,13 +4,18 @@ iOS Shortcuts, versioned as source and built into installable `.shortcut` files.
 
 ## The shortcuts
 
-| Shortcut | What it does | Get it | Docs |
-| --- | --- | --- | --- |
-| **Clipboard to TXT** | Turns clipboard text into a `.txt` file and opens the share sheet with it attached. Nothing is saved to disk. | [Download](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Clipboard%20to%20TXT.shortcut) | [Read](shortcuts/clipboard-to-txt/) |
-| **Clipboard to TXT (Save to Files)** | Same, but writes `iCloud Drive/Shortcuts/Clipboard.txt` first. Fallback if an app refuses the in-memory file. | [Download](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Clipboard%20to%20TXT%20%28Save%20to%20Files%29.shortcut) | [Read](shortcuts/clipboard-to-txt/) |
-| **Read Clipboard (Audiobook)** | Sends clipboard text to an n8n webhook (Lemonfox TTS at 2×) and opens the returned audio in VLC. Holds no credentials — the API key stays in n8n. | [Download](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Read%20Clipboard%20%28Audiobook%29.shortcut) | [Read](shortcuts/audiobook/) |
-| **Upload to Imgur** | Uploads an image to Imgur anonymously (API v3, `POST /3/upload`) and offers the link on the clipboard or a QR code of it saved to Photos. No setup, no account, no client ID. | [Download](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Upload%20to%20Imgur.shortcut) | [Read](shortcuts/imgur-upload/) |
-| **Control (Golden)** — _signing test_ | A known-importable Apple-ecosystem shortcut, signed by the same pipeline. Import it next to Clipboard to TXT: if this one works and that one doesn't, the fault is our shortcut; if both say "invalid", the fault is the signing method. | [Download](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Control%20%28Golden%29.shortcut) | [Read](shortcuts/_control-golden/) |
+Newest at the top — the first row is always whatever was worked on most recently.
+The **Last edited** column is the time of the most recent commit to that
+shortcut's folder; each one links to the folder's commit history on GitHub, so
+the exact change is one click away.
+
+| Shortcut | What it does | Get it | Docs | Last edited |
+| --- | --- | --- | --- | --- |
+| **Upload to Imgur v2** | Uploads an image to Imgur anonymously (API v3, `POST /3/upload`) and offers the link on the clipboard or a QR code of it saved to Photos. No setup, no account, no client ID. **v2** fixes a crash on open in the first build (menu items were serialized in an obsolete format); it imports under the name *Upload to Imgur v2*, so you can tell at a glance which build you have. | [Download](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Upload%20to%20Imgur%20v2.shortcut) | [Read](shortcuts/imgur-upload/) | **2026-09-03 01:03 UTC** · [history](https://github.com/misteramazingyt/shortcuts/commits/main/shortcuts/imgur-upload) |
+| **Clipboard to TXT (Save to Files)** | Turns clipboard text into a `.txt` file and opens the share sheet with it, writing `iCloud Drive/Shortcuts/Clipboard.txt` first. Fallback if an app refuses the in-memory file. | [Download](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Clipboard%20to%20TXT%20%28Save%20to%20Files%29.shortcut) | [Read](shortcuts/clipboard-to-txt/) | 2026-08-09 19:53 UTC · [history](https://github.com/misteramazingyt/shortcuts/commits/main/shortcuts/clipboard-to-txt) |
+| **Clipboard to TXT** | Same, entirely in memory. Nothing is saved to disk. | [Download](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Clipboard%20to%20TXT.shortcut) | [Read](shortcuts/clipboard-to-txt/) | 2026-08-09 19:53 UTC · [history](https://github.com/misteramazingyt/shortcuts/commits/main/shortcuts/clipboard-to-txt) |
+| **Read Clipboard (Audiobook)** | Sends clipboard text to an n8n webhook (Lemonfox TTS at 2×) and opens the returned audio in VLC. Holds no credentials — the API key stays in n8n. | [Download](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Read%20Clipboard%20%28Audiobook%29.shortcut) | [Read](shortcuts/audiobook/) | 2026-08-08 02:08 UTC · [history](https://github.com/misteramazingyt/shortcuts/commits/main/shortcuts/audiobook) |
+| **Control (Golden)** — _signing test_ | A known-importable Apple-ecosystem shortcut, signed by the same pipeline. Import it next to Clipboard to TXT: if this one works and that one doesn't, the fault is our shortcut; if both say "invalid", the fault is the signing method. | [Download](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Control%20%28Golden%29.shortcut) | [Read](shortcuts/_control-golden/) | 2026-08-08 01:30 UTC · [history](https://github.com/misteramazingyt/shortcuts/commits/main/shortcuts/_control-golden) |
 
 > The **Download** links serve the **signed** builds from [`signed/`](signed), produced
 > automatically by CI. The unsigned source plists live under each shortcut's folder.
@@ -107,7 +112,9 @@ directs the generators at `build/unsigned/` instead, so signing cannot modify so
    an optional output-directory argument and default to its own directory.
 2. Run `python3 shortcuts/<name>/build.py` to refresh the committed copy.
 3. Write `shortcuts/<name>/README.md`.
-4. Add a row to the table above.
+4. Add a row at the **top** of the table above, with today's date. The table is
+   newest-first; when you rework an existing shortcut, move its row to the top
+   and update the date.
 
 Nothing needs to change in the CI workflow or `build_and_sign.sh` — any
 `shortcuts/*/build.py` is discovered and built automatically.
