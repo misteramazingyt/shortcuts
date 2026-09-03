@@ -375,6 +375,61 @@ def shortcut(
     return workflow
 
 
+# The input classes a current Shortcuts app writes (from a real export, client
+# version 4033). Differs from ALL_INPUT_CONTENT_ITEM_CLASSES above by adding
+# WFDictionaryContentItem, WFFolderContentItem and WFNumberContentItem.
+MODERN_INPUT_CONTENT_ITEM_CLASSES = [
+    "WFStringContentItem",
+    "WFDictionaryContentItem",
+    "WFURLContentItem",
+    "WFAppStoreAppContentItem",
+    "WFContactContentItem",
+    "WFFolderContentItem",
+    "WFDateContentItem",
+    "WFGenericFileContentItem",
+    "WFDCMapsLinkContentItem",
+    "WFAVAssetContentItem",
+    "WFPDFContentItem",
+    "WFPhoneNumberContentItem",
+    "WFRichTextContentItem",
+    "WFNumberContentItem",
+    "WFiTunesProductContentItem",
+    "WFSafariWebPageContentItem",
+    "WFArticleContentItem",
+    "WFEmailAddressContentItem",
+    "WFImageContentItem",
+    "WFLocationContentItem",
+]
+
+MODERN_CLIENT_VERSION = "4033.0.4.3"
+
+
+def modern_shortcut(actions, glyph_number=59511, start_color=463140863, uses_shortcut_input=False):
+    """The top-level dictionary exactly as a current Shortcuts app exports it.
+
+    `shortcut()` above copies a 2018-era file (client version 736). That works
+    for the simple shortcuts in this repo, but a file stamped that old and
+    containing modern constructs — menus, Ifs, named variables — may be run
+    through the app's migration path for old files, which is a plausible place
+    to crash. This is the alternative: the exact key set of a shortcut exported
+    by Shortcuts at client version 4033 (the Cherri project's decompiler
+    fixture), nothing added, nothing removed.
+    """
+    return {
+        "WFWorkflowActions": actions,
+        "WFWorkflowClientVersion": MODERN_CLIENT_VERSION,
+        "WFWorkflowHasOutputFallback": False,
+        "WFWorkflowHasShortcutInputVariables": bool(uses_shortcut_input),
+        "WFWorkflowIcon": {
+            "WFWorkflowIconGlyphNumber": glyph_number,
+            "WFWorkflowIconStartColor": start_color,
+        },
+        "WFWorkflowInputContentItemClasses": MODERN_INPUT_CONTENT_ITEM_CLASSES,
+        "WFWorkflowMinimumClientVersion": 900,
+        "WFWorkflowMinimumClientVersionString": "900",
+    }
+
+
 def write_shortcut(path, workflow):
     with open(path, "wb") as handle:
         plistlib.dump(workflow, handle, fmt=plistlib.FMT_BINARY)
