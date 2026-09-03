@@ -1,25 +1,22 @@
-# Imgur crash bisect — round 2 (splitting the second half)
+# Imgur crash bisect — round 3 (splitting the upload block)
 
-**Round 1:** the first half of Upload to Imgur (pick image, convert) **opened**;
-the second half (upload + menu) **crashed**. So the culprit is in the second
-half. This round cuts that in two. Same header; B1 then B2 is byte-for-byte the
-second half.
+Trail: round 1 → second half crashes; round 2 → the upload block (B1) crashes,
+the menu (B2) opens. This round cuts the upload block at its one seam. Same
+header; B1a then B1b is byte-for-byte the upload block.
 
 | Rung | What it contains | Download (signed) |
 | --- | --- | --- |
-| **Imgur B1** (the upload, 14 actions) | The If that chooses anonymous vs client-ID, the two Get-Contents-of-URL requests (Form body, image as a File field), the two dictionary lookups (`data` → `link`), the failure alert. | [Imgur B1](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Imgur%20B1.shortcut) |
-| **Imgur B2** (the menu, 9 actions) | Choose from Menu; Copy to Clipboard + notification on one branch; Generate QR Code + Save to Photo Album + notification on the other. | [Imgur B2](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Imgur%20B2.shortcut) |
+| **Imgur B1a** (the request, 7 actions) | The If choosing anonymous vs client-ID, and inside it the two Get-Contents-of-URL actions whose body is a **Form with the image as a File field**. This is the one construct nothing else in this repo uses — the prime suspect. | [Imgur B1a](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Imgur%20B1a.shortcut) |
+| **Imgur B1b** (the parse, 7 actions) | Get Dictionary Value for `data` then `link`, Set Variable, and the "no link → alert, stop" If. | [Imgur B1b](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Imgur%20B1b.shortcut) |
 
 ## Do this
 
 Open both. Tell me which crashes:
 
-- **B1 crashes** → the fault is in the upload actions (the Form/File request, the
-  dictionary lookups, or the alert/exit). I split B1 next.
-- **B2 crashes** → the fault is in the menu actions (Choose from Menu, the QR
-  code, Save to Photo Album). I split B2 next.
-- **Both crash** → each half has a problem, or one they share; I cut the simpler
-  one (B2) first.
+- **B1a crashes** → it is the Form / File request body. That is almost certainly
+  the bug. Next I test a plain request, then the File field on its own, to fix
+  how that field is serialized.
+- **B1b crashes** → it is Get Dictionary Value or the alert/stop. I split B1b.
 
 Only open them; neither uploads.
 
