@@ -1,33 +1,27 @@
-# Imgur crash bisect — round 4 (four revisions of the request)
+# Imgur crash bisect — round 5 (verify the fix)
 
-Trail: second half → upload block → request half (B1a) crashes; the parse half
-(B1b) opens. B1a is an If around two Get-Contents-of-URL requests with a Form
-body. Instead of halving again, here are **four revisions of a single request**,
-each adding one thing to the last. Open them in order; the first that crashes
-names the exact addition responsible.
+The bisect landed on the culprit: **the image sent as a Form File field**
+(`WFItemType 5`). B1a-2 (image as a text field) opened; B1a-3 (image as a File
+field) crashed. The File field's value was serialized with only its inner
+`WFTextTokenAttachment` and no outer `WFTokenAttachmentParameterState` wrapper —
+the app force-casts that and dies on open.
 
-| # | Adds | Download (signed) |
+Ground truth (a documented working Whisper-API multipart upload in the
+[julian-englert/apple-shortcuts](https://github.com/julian-englert/apple-shortcuts)
+decompiler notes) shows the correct two-layer shape. `tools/shortcut_builder.py`
+is fixed to emit it.
+
+| Test | What it is | Download (signed) |
 | --- | --- | --- |
-| **B1a-1** | a bare POST to the URL, no body at all | [B1a-1](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Imgur%20B1a-1.shortcut) |
-| **B1a-2** | + a Form body of text items (image sent as text) | [B1a-2](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Imgur%20B1a-2.shortcut) |
-| **B1a-3** | + the image as a **File field** (`WFItemType 5`) — what the real shortcut does | [B1a-3](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Imgur%20B1a-3.shortcut) |
-| **B1a-4** | + the Authorization headers dictionary | [B1a-4](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Imgur%20B1a-4.shortcut) |
+| **Imgur File Fixed** | The exact B1a-3 request — single POST, Form body, image as a File field — with the corrected serialization. | [Imgur File Fixed](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/signed/Imgur%20File%20Fixed.shortcut) |
 
-## What each outcome means
+## Do this
 
-- **B1a-1 crashes** → Get-Contents-of-URL itself is serialized wrong here.
-- **1 opens, B1a-2 crashes** → the Form body is the problem, not the File field.
-- **2 opens, B1a-3 crashes** → the **File field** (`WFItemType 5`) is the bug —
-  the value I took from a web claim instead of ground truth. I replace how the
-  image is attached and the real shortcut is fixed.
-- **3 opens, B1a-4 crashes** → the headers dictionary is the bug.
-- **all four open** → the crash needs the If wrapper or both requests together;
-  I go back and split B1a that way.
+Open it. If it **opens**, the File field is fixed — and because the real
+**Upload to Imgur v2** uses the same builder, that shortcut is fixed too, so try
+it next. If it still **crashes**, tell me; the fix is wrong and I keep going.
 
-The real shortcut's two requests are B1a-3 (anonymous) and B1a-4 (client-ID), so
-whichever of those first crashes is the actual defect.
-
-Only open them; none upload.
+Only open it; it does not upload.
 
 ## Rebuilding
 
@@ -35,4 +29,4 @@ Only open them; none upload.
 python3 shortcuts/_imgur-ladder/build.py
 ```
 
-Delete this folder once the culprit is found and fixed.
+Delete this folder once Upload to Imgur v2 is confirmed working on the device.

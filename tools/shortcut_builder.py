@@ -183,14 +183,23 @@ def text_item(key, *parts):
 def file_item(key, value):
     """One file entry of a form body — the field an image is uploaded in.
 
-    Unlike a text entry the value is not a text token: it is the attachment
-    itself, so Shortcuts sends the file's bytes as that multipart part instead
-    of a string rendering of it.
+    A File form item's value is doubly wrapped: a WFTokenAttachmentParameterState
+    whose inner value is the WFTextTokenAttachment that points at the file/image
+    variable. An earlier version emitted only the inner WFTextTokenAttachment as
+    WFValue; that missing outer wrapper is what crashed the Shortcuts app on
+    open (a File item — WFItemType 5 — bisected down as the single culprit).
+
+    Verified against a documented working file-upload form (a Whisper-API
+    multipart upload) in the julian-englert/apple-shortcuts decompiler notes,
+    whose File field is exactly this two-layer shape.
     """
     return {
         "WFItemType": ITEM_TYPE_FILE,
         "WFKey": text_token(key),
-        "WFValue": variable_input(value),
+        "WFValue": {
+            "WFSerializationType": "WFTokenAttachmentParameterState",
+            "Value": variable_input(value),
+        },
     }
 
 

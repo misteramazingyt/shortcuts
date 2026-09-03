@@ -97,9 +97,15 @@ compiler for an equivalent program, the first build had these wrong:
   `VariableName`, block-closing markers carry a `UUID`, and a shortcut that
   reads Shortcut Input sets `WFWorkflowHasShortcutInputVariables`.
 
-All of those are fixed in [`build.py`](build.py) and in the shared
-[`tools/shortcut_builder.py`](../../tools/shortcut_builder.py). The If blocks,
-the upload action, and the file-typed form field were already right.
+Those were fixed in [`build.py`](build.py) and the shared
+[`tools/shortcut_builder.py`](../../tools/shortcut_builder.py). But the shortcut
+still crashed, and a construct-by-construct bisect on the device (see
+[`../_imgur-ladder/`](../_imgur-ladder/)) found the real culprit: **the image
+sent as a Form File field.** A File field (`WFItemType 5`) must wrap its value in
+a `WFTokenAttachmentParameterState` around the `WFTextTokenAttachment`; the
+builder had only the inner layer, and the app force-casts the malformed item and
+crashes on open. Corrected against a documented working file-upload form. The If
+blocks and the rest of the upload action were right all along.
 
 [`Upload to Imgur (Minimal).shortcut`](https://raw.githubusercontent.com/misteramazingyt/shortcuts/main/shortcuts/imgur-upload/Upload%20to%20Imgur%20%28Minimal%29.shortcut)
 is the same upload with no If, no menu and no variables — `Select Photos →

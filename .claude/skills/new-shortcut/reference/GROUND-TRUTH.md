@@ -389,8 +389,23 @@ image-data key), `WFWorkflowInputContentItemClasses` (the 20-class modern list),
 - **Shortcut Input** references serialize as
   `{Type: "ExtensionInput", VariableName: "ShortcutInput"}`, and the shortcut
   sets `WFWorkflowHasShortcutInputVariables` at the top level.
-- **A file in a form body** is `WFItemType: 5` and its `WFValue` is the attachment
-  itself (the image variable), not a text token. Text fields are `WFItemType: 0`.
+- **A file in a form body** is `WFItemType: 5`, and its `WFValue` is DOUBLY
+  wrapped — a `WFTokenAttachmentParameterState` whose inner `Value` is the
+  `WFTextTokenAttachment` pointing at the file/image variable:
+
+  ```
+  WFValue = {
+    "WFSerializationType": "WFTokenAttachmentParameterState",
+    "Value": { "WFSerializationType": "WFTextTokenAttachment",
+               "Value": { "Type": "Variable", "VariableName": "Upload" } }
+  }
+  ```
+
+  Emitting only the inner `WFTextTokenAttachment` as `WFValue` (no outer
+  `WFTokenAttachmentParameterState`) CRASHES the app on open — this was bisected
+  on a device as the single culprit in the Imgur uploader. Text fields are
+  `WFItemType: 0` with `WFValue` a plain `WFTextTokenString`. Source: the
+  julian-englert/apple-shortcuts decompiler notes' Whisper-API upload example.
 - **Generate QR Code** takes its text in `WFText`, not `WFInput`.
 - **Literal text fields are plain strings** (e.g. `WFURL`, `WFTextActionText`,
   alert titles). The `WFTextTokenString` wrapper appears only when the field
